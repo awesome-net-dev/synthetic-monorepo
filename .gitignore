@@ -1,0 +1,26 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# NuGet
+*.nupkg
+nupkg/
+
+# MSBuild overlay artifacts and sentinel (generated; live in the backend tree, not here, but defensive)
+.monorepo-active
+
+# IDE
+.idea/
+.claude/
+
+# Test results
+[Tt]est[Rr]esult*/
+
+# macOS filesystem noise
+.DS_Store
+
+# Local launch settings (may contain env vars)
+**/Properties/launchSettings.json

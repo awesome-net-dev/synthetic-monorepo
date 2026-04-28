@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>monorepo</AssemblyName>
+    <RootNamespace>Monorepo.Tool</RootNamespace>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>monorepo</ToolCommandName>
+    <PackageId>Monorepo.Tool</PackageId>
+    <Version>0.2.0</Version>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <LangVersion>latest</LangVersion>
+    <Description>Synthetic monorepo overlay manager — rewrites PackageReferences to ProjectReferences for sibling repos without modifying any leaf repo.</Description>
+    <Authors>awesome-net-dev</Authors>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/awesome-net-dev/synthetic-monorepo</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Monorepo.Tool.Tests" />
+  </ItemGroup>
+
+</Project>

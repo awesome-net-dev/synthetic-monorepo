@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test-pack:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/Monorepo.Tool
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore ../Monorepo.Tool.Tests/Monorepo.Tool.Tests.csproj
+
+      - name: Build
+        run: dotnet build ../Monorepo.Tool.Tests/Monorepo.Tool.Tests.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test ../Monorepo.Tool.Tests/Monorepo.Tool.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Pack
+        run: dotnet pack --configuration Release --no-build -o ${{ github.workspace }}/nupkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: nupkg/*.nupkg
+          if-no-files-found: error
