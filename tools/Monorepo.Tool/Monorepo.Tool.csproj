@@ -8,7 +8,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>monorepo</ToolCommandName>
     <PackageId>Monorepo.Tool</PackageId>
-    <Version>0.2.0</Version>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -22,6 +22,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="all" />
     <PackageReference Include="System.CommandLine" Version="2.0.7" />
   </ItemGroup>
 
