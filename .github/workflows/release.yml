@@ -1,0 +1,38 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/Monorepo.Tool
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore ../Monorepo.Tool.Tests/Monorepo.Tool.Tests.csproj
+
+      - name: Build
+        run: dotnet build ../Monorepo.Tool.Tests/Monorepo.Tool.Tests.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test ../Monorepo.Tool.Tests/Monorepo.Tool.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Pack
+        run: dotnet pack --configuration Release --no-build -o ${{ github.workspace }}/nupkg
+
+      - name: Push to NuGet
+        run: >
+          dotnet nuget push "${{ github.workspace }}/nupkg/*.nupkg"
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
