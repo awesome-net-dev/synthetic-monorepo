@@ -57,6 +57,30 @@ public static class SolutionWriter
             }
         }
 
+        // ── Optionally include tool csproj files from {slnDir}/tools/ ────────
+        var slnToolsDir = Path.Combine(slnDir, "tools");
+        if (Directory.Exists(slnToolsDir))
+        {
+            var toolCsprojs = Monorepo.Tool.Discovery.FileSystemHelpers
+                .EnumerateCsprojs(slnToolsDir)
+                .OrderBy(f => f)
+                .ToList();
+
+            if (toolCsprojs.Count > 0)
+            {
+                repoFolders["__tools"] = Stable("folder:__tools");
+                foreach (var csproj in toolCsprojs)
+                {
+                    var relPath = Path.GetRelativePath(slnDir, csproj).Replace('\\', '/');
+                    projects.Add(new ProjectEntry(
+                        Name:     Path.GetFileNameWithoutExtension(csproj),
+                        RelPath:  relPath,
+                        Guid:     Stable("project:" + relPath.ToLowerInvariant()),
+                        RepoPath: "__tools"));
+                }
+            }
+        }
+
         var sb = new StringBuilder();
         sb.AppendLine();
         sb.AppendLine("Microsoft Visual Studio Solution File, Format Version 12.00");
