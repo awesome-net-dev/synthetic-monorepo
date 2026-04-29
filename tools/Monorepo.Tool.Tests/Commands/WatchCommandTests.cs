@@ -8,9 +8,10 @@ namespace Monorepo.Tool.Tests.Commands;
 public class WatchCommandTests
 {
     [Fact]
-    public async Task Watch_returns_GeneralError_when_config_path_invalid()
+    public async Task Watch_returns_error_when_config_directory_not_found()
     {
         using var fx = new TempRepoFixture();
+        // nonexistent/ directory → DirectoryNotFoundException → GeneralError (1)
         var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
         Assert.Equal(1, await Program.Run(
             ["watch", "--config", missingConfig],

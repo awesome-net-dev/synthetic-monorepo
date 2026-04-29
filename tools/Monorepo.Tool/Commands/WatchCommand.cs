@@ -85,11 +85,12 @@ public static class WatchCommand
         Func<string, IFileWatcher> watcherFactory)
     {
         var appCts = new CancellationTokenSource();
-        Console.CancelKeyPress += (_, e) =>
+        ConsoleCancelEventHandler cancelHandler = (_, e) =>
         {
             e.Cancel = true;
             appCts.Cancel();
         };
+        Console.CancelKeyPress += cancelHandler;
 
         using var watcher = watcherFactory(backendRoot);
 
@@ -137,6 +138,7 @@ public static class WatchCommand
         try { await Task.Delay(Timeout.Infinite, appCts.Token); }
         catch (OperationCanceledException) { }
 
+        Console.CancelKeyPress -= cancelHandler;
         Console.WriteLine();
         CliOutput.Muted("Stopped.");
         return 0;
