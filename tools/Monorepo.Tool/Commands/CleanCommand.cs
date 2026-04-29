@@ -7,17 +7,20 @@ public static class CleanCommand
 {
     public static Command Build()
     {
-        var dryRunOpt = new Option<bool>(
-            "--dry-run",
-            "Print what would be deleted without removing anything.");
+        var dryRunOpt = new Option<bool>("--dry-run")
+        {
+            Description = "Print what would be deleted without removing anything."
+        };
 
-        var verboseOpt = new Option<bool>(
-            "--verbose",
-            "List every directory as it is deleted.");
+        var verboseOpt = new Option<bool>("--verbose")
+        {
+            Description = "List every directory as it is deleted."
+        };
 
-        var configOpt = new Option<FileInfo?>(
-            "--config",
-            "Explicit path to monorepo.json. Defaults to walking up from CWD.");
+        var configOpt = new Option<FileInfo?>("--config")
+        {
+            Description = "Explicit path to monorepo.json. Defaults to walking up from CWD."
+        };
 
         var cmd = new Command("clean",
             "Delete bin/ and obj/ build artifact directories from all repos " +

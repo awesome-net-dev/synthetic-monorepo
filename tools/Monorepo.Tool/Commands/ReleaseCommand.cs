@@ -1,6 +1,5 @@
 using System.CommandLine;
-using System.Diagnostics;
-using Monorepo.Tool.Release;
+using Monorepo.Tool.Releases;
 using Monorepo.Tool.Serialization;
 
 namespace Monorepo.Tool.Commands;
@@ -21,8 +20,10 @@ public static class ReleaseCommand
             Description = "Version bump: auto (derive from commits), major, minor, or patch."
         };
 
-        var dryRunOpt = new Option<bool>("--dry-run",
-            "Print release notes and next version; do not write CHANGELOG.md or create a tag.");
+        var dryRunOpt = new Option<bool>("--dry-run")
+        {
+            Description = "Print release notes and next version; do not write CHANGELOG.md or create a tag."
+        };
 
         var verboseOpt = new Option<bool>("--verbose")
         {
@@ -102,7 +103,7 @@ public static class ReleaseCommand
                 }
 
                 var repoName   = Path.GetFileName(repoDir);
-                var tagGlob    = BuildTagGlob(tagFormat, repoName);
+                var tagGlob    = TagFormatter.ToGlob(tagFormat, repoName);
                 var latestTag  = GitLogReader.GetLatestTag(repoDir, tagGlob);
                 var rawCommits = GitLogReader.GetCommitsSinceTag(repoDir, latestTag);
 
@@ -116,7 +117,7 @@ public static class ReleaseCommand
                     foreach (var c in rawCommits)
                         Console.WriteLine($"  [{c.Hash[..7]}] {c.Subject}");
 
-                var currentVersion = ExtractVersion(latestTag, tagFormat, repoName) ?? "0.0.0";
+                var currentVersion = TagFormatter.ExtractVersion(latestTag, tagFormat, repoName) ?? "0.0.0";
 
                 var bump = bumpArg.ToLowerInvariant() switch
                 {
@@ -128,7 +129,7 @@ public static class ReleaseCommand
 
                 var nextVersion = SemVerBumper.Bump(currentVersion, bump);
 
-                var nextTag = ResolveTag(tagFormat, nextVersion, repoName);
+                var nextTag = TagFormatter.Resolve(tagFormat, nextVersion, repoName);
                 Console.WriteLine($"  Current: {(latestTag ?? "none")}  →  Next: {nextTag}  ({bump})");
                 Console.WriteLine($"  {rawCommits.Count} commit(s) since last tag ({parsed.Count} conventional)");
 
@@ -137,7 +138,7 @@ public static class ReleaseCommand
                 if (!dryRun)
                 {
                     ChangelogWriter.Write(repoDir, nextVersion, parsed, DateTime.Today, dryRun: false);
-                    CreateGitTag(repoDir, nextTag);
+                    GitTagger.CreateTag(repoDir, nextTag);
                     Console.WriteLine($"  ✓ Tagged {nextTag} and updated CHANGELOG.md");
                 }
                 else
@@ -165,46 +166,5 @@ public static class ReleaseCommand
             var scope = c.Scope is not null ? $"({c.Scope})" : "";
             Console.WriteLine($"  {label}{scope}: {c.Description}");
         }
-    }
-
-    private static void CreateGitTag(string repoPath, string tag)
-    {
-        var psi = new ProcessStartInfo("git")
-        {
-            WorkingDirectory = repoPath,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.ArgumentList.Add("tag");
-        psi.ArgumentList.Add("-a");
-        psi.ArgumentList.Add(tag);
-        psi.ArgumentList.Add("-m");
-        psi.ArgumentList.Add($"Release {tag}");
-        using var proc = Process.Start(psi)!;
-        var stderr = proc.StandardError.ReadToEnd();
-        proc.WaitForExit();
-        if (proc.ExitCode != 0)
-            Console.Error.WriteLine($"  Warning: git tag failed — {stderr.Trim()}");
-    }
-
-    private static string ResolveTag(string format, string version, string repoName)
-        => format.Replace("{version}", version).Replace("{repo}", repoName);
-
-    private static string BuildTagGlob(string format, string repoName)
-        => format.Replace("{version}", "*").Replace("{repo}", repoName);
-
-    private static string? ExtractVersion(string? tag, string format, string repoName)
-    {
-        if (tag is null) return null;
-        var vIdx = format.IndexOf("{version}", StringComparison.Ordinal);
-        var prefix = format[..vIdx].Replace("{repo}", repoName);
-        var suffix = format[(vIdx + "{version}".Length)..].Replace("{repo}", repoName);
-        if (!tag.StartsWith(prefix, StringComparison.Ordinal)
-            || !tag.EndsWith(suffix, StringComparison.Ordinal))
-            return tag;
-        var start = prefix.Length;
-        var end   = tag.Length - suffix.Length;
-        return start <= end ? tag[start..end] : tag;
     }
 }

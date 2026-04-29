@@ -1,4 +1,4 @@
-using Monorepo.Tool.Release;
+using Monorepo.Tool.Releases;
 using Xunit;
 
 namespace Monorepo.Tool.Tests.Release;
