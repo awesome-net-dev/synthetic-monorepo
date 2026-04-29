@@ -90,7 +90,16 @@ public static class GenerateCommand
                 foreach (var stale in config.Mappings.Where(m => !discoveredPkgs.Contains(m.PackageId)))
                     Console.WriteLine($"  ⚠  Stale mapping removed: '{stale.PackageId}' (csproj no longer found).");
 
-                config.Repos    = [.. result.Repos];
+                var existingReposByPath = config.Repos
+                    .ToDictionary(r => r.Path, StringComparer.OrdinalIgnoreCase);
+
+                config.Repos = result.Repos.Select(discovered =>
+                {
+                    if (existingReposByPath.TryGetValue(discovered.Path, out var existing))
+                        discovered.Url ??= existing.Url; // keep manually-set URL if scanner found none
+                    return discovered;
+                }).ToList();
+
                 config.Mappings = merged;
 
                 foreach (var w in result.Warnings)

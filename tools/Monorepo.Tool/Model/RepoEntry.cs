@@ -10,6 +10,9 @@ public sealed class RepoEntry
 
     public string? ExemptReason { get; set; }
 
+    /// <summary>Git remote origin URL — used by 'monorepo clone' to bootstrap a fresh machine.</summary>
+    public string? Url { get; set; }
+
     /// <summary>PackageIds produced by csprojs inside this repo.</summary>
     public List<string> ProducedPackages { get; set; } = [];
 }

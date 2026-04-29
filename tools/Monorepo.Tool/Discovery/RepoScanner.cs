@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Monorepo.Tool.Model;
 
 namespace Monorepo.Tool.Discovery;
@@ -57,10 +58,30 @@ public static class RepoScanner
 
         return new RepoEntry
         {
-            Path           = relativePath,
-            Exempt         = hasOwnDbp,
-            ExemptReason   = hasOwnDbp ? "owns Directory.Build.props" : null,
+            Path             = relativePath,
+            Exempt           = hasOwnDbp,
+            ExemptReason     = hasOwnDbp ? "owns Directory.Build.props" : null,
+            Url              = GetRemoteUrl(repoDir.FullName),
             ProducedPackages = [],
         };
+    }
+
+    private static string? GetRemoteUrl(string repoPath)
+    {
+        var psi = new ProcessStartInfo("git")
+        {
+            WorkingDirectory       = repoPath,
+            RedirectStandardOutput = true,
+            RedirectStandardError  = true,
+            UseShellExecute        = false,
+        };
+        psi.ArgumentList.Add("remote");
+        psi.ArgumentList.Add("get-url");
+        psi.ArgumentList.Add("origin");
+        using var proc = Process.Start(psi);
+        if (proc is null) return null;
+        var url = proc.StandardOutput.ReadToEnd().Trim();
+        proc.WaitForExit();
+        return proc.ExitCode == 0 && url.Length > 0 ? url : null;
     }
 }

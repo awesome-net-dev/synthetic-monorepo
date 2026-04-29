@@ -47,7 +47,8 @@ public static class Program
             CpmCommand.Build(),
             ReleaseCommand.Build(),
             CleanCommand.Build(),
-            BumpCommand.Build()
+            BumpCommand.Build(),
+            CloneCommand.Build()
         };
 
         root.SetAction(_ =>
