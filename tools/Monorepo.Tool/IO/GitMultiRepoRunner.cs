@@ -24,7 +24,13 @@ public static class GitMultiRepoRunner
     {
         if (parallel)
         {
-            var tasks = repos.Select(r => RunOneAsync(r, backendRoot, args, ct));
+            var semaphore = new SemaphoreSlim(Math.Max(1, Environment.ProcessorCount));
+            var tasks = repos.Select(async r =>
+            {
+                await semaphore.WaitAsync(ct);
+                try   { return await RunOneAsync(r, backendRoot, args, ct); }
+                finally { semaphore.Release(); }
+            });
             return await Task.WhenAll(tasks);
         }
 
@@ -57,10 +63,18 @@ public static class GitMultiRepoRunner
             psi.ArgumentList.Add(arg);
 
         using var proc = Process.Start(psi)!;
-        var stdout = await proc.StandardOutput.ReadToEndAsync(ct);
-        var stderr = await proc.StandardError.ReadToEndAsync(ct);
-        await proc.WaitForExitAsync(ct);
-
-        return new RepoResult(repo.Path, stdout.TrimEnd(), stderr.TrimEnd(), proc.ExitCode);
+        try
+        {
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync(ct);
+            var stderrTask = proc.StandardError.ReadToEndAsync(ct);
+            await Task.WhenAll(stdoutTask, stderrTask);
+            await proc.WaitForExitAsync(ct);
+            return new RepoResult(repo.Path, stdoutTask.Result.TrimEnd(), stderrTask.Result.TrimEnd(), proc.ExitCode);
+        }
+        catch (OperationCanceledException)
+        {
+            try { proc.Kill(entireProcessTree: true); } catch { }
+            throw;
+        }
     }
 }

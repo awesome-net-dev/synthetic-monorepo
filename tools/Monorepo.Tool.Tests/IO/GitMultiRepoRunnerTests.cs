@@ -11,7 +11,7 @@ public class GitMultiRepoRunnerTests
     {
         var repos = new[] { new RepoEntry { Path = "no-such-repo" } };
         var results = await GitMultiRepoRunner.RunAsync(
-            repos, "/tmp/no-such-backend", ["git", "--version"]);
+            repos, Path.Combine(Path.GetTempPath(), "no-such-backend-" + Guid.NewGuid()), ["git", "--version"]);
         var r = Assert.Single(results);
         Assert.Equal(-1, r.ExitCode);
         Assert.False(r.Success);
