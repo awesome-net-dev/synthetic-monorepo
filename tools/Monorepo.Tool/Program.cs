@@ -50,6 +50,7 @@ public static class Program
             BumpCommand.Build(),
             CloneCommand.Build(),
             ChangesCommand.Build(),
+            ExecCommand.Build()
         };
 
         root.SetAction(_ =>
