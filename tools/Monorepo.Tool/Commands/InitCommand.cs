@@ -49,7 +49,7 @@ public static class InitCommand
             forceOpt,
         };
 
-        cmd.SetAction((ParseResult parseResult) =>
+        cmd.SetAction(parseResult =>
         {
             var backend = parseResult.GetValue(backendOpt)!;
             var overlay = parseResult.GetValue(overlayOpt)!;
@@ -63,7 +63,7 @@ public static class InitCommand
                 Console.Error.WriteLine(
                     $"Error: {configPath} already exists. Use 'monorepo generate --refresh' to update it " +
                     "(which preserves manual Enabled=false overrides), or pass --force to overwrite.");
-                return (int)Monorepo.Tool.IO.ExitCode.InvalidInput;
+                return (int)IO.ExitCode.InvalidInput;
             }
 
             Console.WriteLine("Discovering repos...");
@@ -103,11 +103,11 @@ public static class InitCommand
 
             // Generate overlay and solution
             var overlayDir = Path.Combine(overlay.FullName, "overlay");
-            var slnPath    = Path.Combine(overlay.FullName, "Monorepo.sln");
+            var slnxPath    = Path.Combine(overlay.FullName, "Monorepo.slnx");
             Console.WriteLine("Generating overlay files...");
             ShimWriter.Write(backend.FullName, overlayDir, dryRun);
             OverlayWriter.Write(overlayDir, backend.FullName, config.Mappings, dryRun);
-            SolutionWriter.Write(slnPath, backend.FullName, config.Repos, dryRun);
+            SlnxWriter.Write(slnxPath, backend.FullName, config.Repos, dryRun);
 
             // Activate sentinel
             Console.WriteLine("Activating sentinel...");

@@ -20,7 +20,7 @@ public static class StatusCommand
             configOpt,
         };
 
-        cmd.SetAction((ParseResult parseResult) =>
+        cmd.SetAction(parseResult =>
         {
             var configFile = parseResult.GetValue(configOpt);
             var configPath = configFile?.FullName
@@ -29,7 +29,7 @@ public static class StatusCommand
             if (configPath is null)
             {
                 Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
-                return (int)Monorepo.Tool.IO.ExitCode.ConfigNotFound;
+                return (int)IO.ExitCode.ConfigNotFound;
             }
 
             var config = ConfigSerializer.Load(configPath);
@@ -84,7 +84,7 @@ public static class StatusCommand
                 Console.WriteLine("Drift: none detected.");
 
             Console.WriteLine();
-            return missing > 0 ? (int)Monorepo.Tool.IO.ExitCode.Drift : 0;
+            return missing > 0 ? (int)IO.ExitCode.Drift : 0;
         });
 
         return cmd;

@@ -19,7 +19,7 @@ public class InitOverwriteTests
         var sentinel = new MonorepoConfig { BackendRoot = "sentinel-value" };
         ConfigSerializer.Save(sentinel, configPath);
 
-        var root = Monorepo.Tool.Program.BuildRoot();
+        var root = Program.BuildRoot();
         var exit = await root.Parse(["init", "--backend", backend, "--overlay", overlay]).InvokeAsync();
 
         Assert.NotEqual(0, exit);
@@ -38,7 +38,7 @@ public class InitOverwriteTests
         var configPath = Path.Combine(overlay, "monorepo.json");
         ConfigSerializer.Save(new MonorepoConfig { BackendRoot = "sentinel-value" }, configPath);
 
-        var root = Monorepo.Tool.Program.BuildRoot();
+        var root = Program.BuildRoot();
         var exit = await root.Parse(["init", "--backend", backend, "--overlay", overlay, "--force"]).InvokeAsync();
 
         Assert.Equal(0, exit);

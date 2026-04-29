@@ -35,17 +35,18 @@ public static class Program
     {
         var root = new RootCommand(
             "Synthetic monorepo overlay manager — rewrites PackageReferences to " +
-            "ProjectReferences for sibling repos without modifying any leaf repo.");
+            "ProjectReferences for sibling repos without modifying any leaf repo.")
+        {
+            InitCommand.Build(),
+            GenerateCommand.Build(),
+            OnOffCommand.BuildOn(),
+            OnOffCommand.BuildOff(),
+            StatusCommand.Build(),
+            EnableDisableCommand.BuildEnable(),
+            EnableDisableCommand.BuildDisable(),
+        };
 
-        root.Add(InitCommand.Build());
-        root.Add(GenerateCommand.Build());
-        root.Add(OnOffCommand.BuildOn());
-        root.Add(OnOffCommand.BuildOff());
-        root.Add(StatusCommand.Build());
-        root.Add(EnableDisableCommand.BuildEnable());
-        root.Add(EnableDisableCommand.BuildDisable());
-
-        root.SetAction((ParseResult _) =>
+        root.SetAction(_ =>
         {
             Console.WriteLine(root.Description);
             Console.WriteLine();

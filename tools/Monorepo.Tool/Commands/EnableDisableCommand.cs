@@ -24,7 +24,7 @@ public static class EnableDisableCommand
             configOpt,
         };
 
-        cmd.SetAction((ParseResult parseResult) =>
+        cmd.SetAction(parseResult =>
         {
             var pkg        = parseResult.GetValue(packageArg)!;
             var configFile = parseResult.GetValue(configOpt);

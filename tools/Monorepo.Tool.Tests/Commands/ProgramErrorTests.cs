@@ -12,8 +12,8 @@ public class ProgramErrorTests
         try
         {
             Directory.SetCurrentDirectory(fx.Root);
-            var exit = await Monorepo.Tool.Program.Main(["status"]);
-            Assert.Equal((int)Monorepo.Tool.IO.ExitCode.ConfigNotFound, exit);
+            var exit = await Program.Main(["status"]);
+            Assert.Equal((int)IO.ExitCode.ConfigNotFound, exit);
         }
         finally
         {
@@ -24,7 +24,7 @@ public class ProgramErrorTests
     [Fact]
     public async Task Unknown_command_returns_nonzero()
     {
-        var exit = await Monorepo.Tool.Program.Main(["this-is-not-a-command"]);
+        var exit = await Program.Main(["this-is-not-a-command"]);
         Assert.NotEqual(0, exit);
     }
 
@@ -36,7 +36,7 @@ public class ProgramErrorTests
         Console.SetOut(sw);
         try
         {
-            var exit = await Monorepo.Tool.Program.Main(["--version"]);
+            var exit = await Program.Main(["--version"]);
             Assert.Equal(0, exit);
             Assert.False(string.IsNullOrWhiteSpace(sw.ToString()));
         }

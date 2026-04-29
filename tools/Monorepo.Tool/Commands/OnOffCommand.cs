@@ -18,7 +18,7 @@ public static class OnOffCommand
         };
 
         var cmd = new Command(name, description) { configOpt };
-        cmd.SetAction((ParseResult parseResult) =>
+        cmd.SetAction(parseResult =>
         {
             var configFile = parseResult.GetValue(configOpt);
             var configPath = configFile?.FullName

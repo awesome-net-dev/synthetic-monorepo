@@ -28,7 +28,7 @@ public class EndToEndTests
             """);
 
         // 1. init
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["init", "--backend", backend, "--overlay", overlay]));
+        Assert.Equal(0, await Program.Main(["init", "--backend", backend, "--overlay", overlay]));
         var configPath = Path.Combine(overlay, "monorepo.json");
         Assert.True(File.Exists(configPath));
         var cfg = ConfigSerializer.Load(configPath);
@@ -46,24 +46,24 @@ public class EndToEndTests
         Assert.True(File.Exists(Path.Combine(overlay, "overlay", "Directory.Build.targets")));
 
         // 2. off / on toggle
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["off", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["off", "--config", configPath]));
         Assert.False(File.Exists(Path.Combine(backend, ".monorepo-active")));
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["on",  "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["on",  "--config", configPath]));
         Assert.True (File.Exists(Path.Combine(backend, ".monorepo-active")));
 
         // 3. disable + regenerate → mapping removed from targets
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["disable", "Shared.Lib", "--config", configPath]));
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["generate", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["disable", "Shared.Lib", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["generate", "--config", configPath]));
         var targets = File.ReadAllText(Path.Combine(overlay, "overlay", "Directory.Build.targets"));
         Assert.DoesNotContain("<ProjectReference", targets);
 
         // 4. enable again → mapping injected
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["enable", "Shared.Lib", "--config", configPath]));
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["generate", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["enable", "Shared.Lib", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["generate", "--config", configPath]));
         targets = File.ReadAllText(Path.Combine(overlay, "overlay", "Directory.Build.targets"));
         Assert.Contains("<ProjectReference", targets);
 
         // 5. status with no drift returns 0
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["status", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["status", "--config", configPath]));
     }
 }

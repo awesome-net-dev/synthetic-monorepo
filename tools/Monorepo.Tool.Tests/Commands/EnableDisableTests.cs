@@ -10,7 +10,7 @@ public class EnableDisableTests
     public async Task Disable_sets_Enabled_false_for_matching_package()
     {
         using var fx = SetupConfig(enabled: true);
-        var exit = await Monorepo.Tool.Program.Main(
+        var exit = await Program.Main(
             ["disable", "Foo.Bar", "--config", fx.ConfigPath]);
         Assert.Equal(0, exit);
 
@@ -22,7 +22,7 @@ public class EnableDisableTests
     public async Task Enable_sets_Enabled_true_for_matching_package()
     {
         using var fx = SetupConfig(enabled: false);
-        var exit = await Monorepo.Tool.Program.Main(
+        var exit = await Program.Main(
             ["enable", "Foo.Bar", "--config", fx.ConfigPath]);
         Assert.Equal(0, exit);
 
@@ -34,7 +34,7 @@ public class EnableDisableTests
     public async Task Disable_returns_nonzero_when_package_is_unknown()
     {
         using var fx = SetupConfig(enabled: true);
-        var exit = await Monorepo.Tool.Program.Main(
+        var exit = await Program.Main(
             ["disable", "Not.A.Package", "--config", fx.ConfigPath]);
         Assert.NotEqual(0, exit);
     }

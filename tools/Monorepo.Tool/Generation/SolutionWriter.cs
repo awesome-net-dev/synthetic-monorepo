@@ -46,7 +46,7 @@ public static class SolutionWriter
             repoFolders[repo.Path] = Stable("folder:" + repo.Path);
 
             var repoDir = Path.Combine(backendRoot, repo.Path.Replace('/', Path.DirectorySeparatorChar));
-            foreach (var csproj in Monorepo.Tool.Discovery.FileSystemHelpers.EnumerateCsprojs(repoDir))
+            foreach (var csproj in Discovery.FileSystemHelpers.EnumerateCsprojs(repoDir))
             {
                 var relPath = Path.GetRelativePath(slnDir, csproj).Replace('\\', '/');
                 projects.Add(new ProjectEntry(
@@ -61,7 +61,7 @@ public static class SolutionWriter
         var slnToolsDir = Path.Combine(slnDir, "tools");
         if (Directory.Exists(slnToolsDir))
         {
-            var toolCsprojs = Monorepo.Tool.Discovery.FileSystemHelpers
+            var toolCsprojs = Discovery.FileSystemHelpers
                 .EnumerateCsprojs(slnToolsDir)
                 .OrderBy(f => f)
                 .ToList();
@@ -144,7 +144,7 @@ public static class SolutionWriter
         sb.AppendLine("\tEndGlobalSection");
         sb.AppendLine("EndGlobal");
 
-        Monorepo.Tool.IO.AtomicFile.WriteAllTextIfChanged(slnPath, sb.ToString(), dryRun);
+        IO.AtomicFile.WriteAllTextIfChanged(slnPath, sb.ToString(), dryRun);
     }
 
     private sealed record ProjectEntry(string Name, string RelPath, Guid Guid, string RepoPath);

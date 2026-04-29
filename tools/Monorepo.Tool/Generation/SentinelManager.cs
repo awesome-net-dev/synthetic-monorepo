@@ -18,7 +18,7 @@ public static class SentinelManager
             Console.WriteLine($"  [dry-run] Would create: {path}");
             return;
         }
-        Monorepo.Tool.IO.AtomicFile.WriteAllText(path, "");
+        IO.AtomicFile.WriteAllText(path, "");
         Console.WriteLine($"  Created:  {path}");
     }
 

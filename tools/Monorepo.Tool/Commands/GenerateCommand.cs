@@ -40,7 +40,7 @@ public static class GenerateCommand
             configOpt,
         };
 
-        cmd.SetAction((ParseResult parseResult) =>
+        cmd.SetAction(parseResult =>
         {
             var refresh    = parseResult.GetValue(refreshOpt);
             var dryRun     = parseResult.GetValue(dryRunOpt);
@@ -53,7 +53,7 @@ public static class GenerateCommand
             if (configPath is null)
             {
                 Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
-                return (int)Monorepo.Tool.IO.ExitCode.ConfigNotFound;
+                return (int)IO.ExitCode.ConfigNotFound;
             }
 
             var config     = ConfigSerializer.Load(configPath);
@@ -107,11 +107,11 @@ public static class GenerateCommand
                 }
             }
 
-            var slnPath = Path.Combine(Path.GetDirectoryName(configPath)!, "Monorepo.sln");
+            var slnxPath = Path.Combine(Path.GetDirectoryName(configPath)!, "Monorepo.slnx");
             Console.WriteLine("Generating overlay files...");
             ShimWriter.Write(backendRoot, overlayDir, dryRun);
             OverlayWriter.Write(overlayDir, backendRoot, config.Mappings, dryRun);
-            SolutionWriter.Write(slnPath, backendRoot, config.Repos, dryRun);
+            SlnxWriter.Write(slnxPath, backendRoot, config.Repos, dryRun);
 
             Console.WriteLine("Done.");
             return 0;

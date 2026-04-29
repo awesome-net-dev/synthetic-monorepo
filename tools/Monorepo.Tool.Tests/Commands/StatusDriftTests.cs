@@ -29,7 +29,7 @@ public class StatusDriftTests
             }],
         }, configPath);
 
-        var exit = await Monorepo.Tool.Program.Main(["status", "--config", configPath]);
+        var exit = await Program.Main(["status", "--config", configPath]);
 
         Assert.Equal((int)ExitCode.Drift, exit);
     }
@@ -59,7 +59,7 @@ public class StatusDriftTests
             }],
         }, configPath);
 
-        var exit = await Monorepo.Tool.Program.Main(["status", "--config", configPath]);
+        var exit = await Program.Main(["status", "--config", configPath]);
 
         Assert.Equal(0, exit);
     }

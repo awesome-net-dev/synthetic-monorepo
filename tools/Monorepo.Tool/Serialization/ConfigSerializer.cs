@@ -23,7 +23,7 @@ public static class ConfigSerializer
     public static void Save(MonorepoConfig config, string path)
     {
         var json = JsonSerializer.Serialize(config, Options);
-        Monorepo.Tool.IO.AtomicFile.WriteAllText(path, json);
+        IO.AtomicFile.WriteAllText(path, json);
     }
 
     /// <summary>

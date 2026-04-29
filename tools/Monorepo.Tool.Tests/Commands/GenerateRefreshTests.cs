@@ -13,10 +13,10 @@ public class GenerateRefreshTests
         var (backend, overlay, configPath) = await InitFromProducerConsumer(fx, "Shared.Lib");
 
         // User manually disables
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["disable", "Shared.Lib", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["disable", "Shared.Lib", "--config", configPath]));
 
         // generate --refresh should NOT re-enable
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["generate", "--refresh", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["generate", "--refresh", "--config", configPath]));
 
         var cfg = ConfigSerializer.Load(configPath);
         Assert.False(cfg.Mappings.Single(m => m.PackageId == "Shared.Lib").Enabled);
@@ -42,7 +42,7 @@ public class GenerateRefreshTests
             </Project>
             """);
 
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["generate", "--refresh", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["generate", "--refresh", "--config", configPath]));
 
         var cfg = ConfigSerializer.Load(configPath);
         Assert.Contains(cfg.Mappings, m => m.PackageId == "Extra.Lib"   && m.Enabled);
@@ -58,7 +58,7 @@ public class GenerateRefreshTests
         // Delete the producer csproj
         File.Delete(Path.Combine(backend, "producer", "src", "P.csproj"));
 
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["generate", "--refresh", "--config", configPath]));
+        Assert.Equal(0, await Program.Main(["generate", "--refresh", "--config", configPath]));
 
         var cfg = ConfigSerializer.Load(configPath);
         Assert.DoesNotContain(cfg.Mappings, m => m.PackageId == "Shared.Lib");
@@ -84,7 +84,7 @@ public class GenerateRefreshTests
             </Project>
             """);
 
-        Assert.Equal(0, await Monorepo.Tool.Program.Main(["init", "--backend", backend, "--overlay", overlay]));
+        Assert.Equal(0, await Program.Main(["init", "--backend", backend, "--overlay", overlay]));
         return (backend, overlay, Path.Combine(overlay, "monorepo.json"));
     }
 }
