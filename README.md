@@ -74,7 +74,7 @@ Run this once from inside your overlay directory (e.g. `backend/synthetic-monore
 monorepo init --backend ../
 ```
 
-This scans all sibling repos, discovers cross-repo `PackageReference` relationships, writes `monorepo.json`, and generates the MSBuild overlay. Nothing in the sibling repos is touched.
+This scans all sibling repos, discovers cross-repo `PackageReference` relationships, writes `monorepo.json`, generates the MSBuild overlay, and **activates the sentinel immediately**. Nothing in the sibling repos is touched.
 
 ### 2. Turn it on
 
@@ -114,7 +114,7 @@ monorepo status
 
 ```
 backend/
-├── .monorepo-active              ← sentinel (created by `on`, removed by `off`)
+├── .monorepo-active              ← sentinel (created by `init`/`on`, removed by `off`)
 ├── Directory.Build.props         ← generated shim (imports overlay when sentinel exists)
 ├── Directory.Build.targets       ← generated shim (imports overlay when sentinel exists)
 │
@@ -124,7 +124,7 @@ backend/
 │
 └── synthetic-monorepo/           ← this tool lives here
     ├── monorepo.json             ← discovered mappings
-    ├── Monorepo.sln              ← generated solution spanning all repos
+    ├── Monorepo.slnx             ← generated solution spanning all repos
     └── overlay/
         └── Directory.Build.targets   ← the rewrite logic
 ```
