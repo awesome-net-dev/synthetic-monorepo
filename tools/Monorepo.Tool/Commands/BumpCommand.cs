@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Monorepo.Tool.IO;
 using Monorepo.Tool.Releases;
 using Monorepo.Tool.Serialization;
 
@@ -61,8 +62,8 @@ public static class BumpCommand
 
             if (!tagFormat.Contains("{version}", StringComparison.Ordinal))
             {
-                Console.Error.WriteLine("Error: --tag-format must contain the {version} placeholder.");
-                return (int)IO.ExitCode.InvalidInput;
+                CliOutput.Error("Error: --tag-format must contain the {version} placeholder.");
+                return (int)ExitCode.InvalidInput;
             }
 
             var configPath = configFile?.FullName
@@ -70,8 +71,8 @@ public static class BumpCommand
 
             if (configPath is null)
             {
-                Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
-                return (int)IO.ExitCode.ConfigNotFound;
+                CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
+                return (int)ExitCode.ConfigNotFound;
             }
 
             var config = ConfigSerializer.Load(configPath);
@@ -86,21 +87,21 @@ public static class BumpCommand
 
             if (targetRepos.Count == 0)
             {
-                Console.Error.WriteLine(repoFilter is null
+                CliOutput.Error(repoFilter is null
                     ? "No repos found in config."
                     : $"Repo '{repoFilter}' not found in config.");
-                return (int)IO.ExitCode.InvalidInput;
+                return (int)ExitCode.InvalidInput;
             }
 
             foreach (var repo in targetRepos)
             {
                 var repoDir = Path.Combine(backendRoot, repo.Path.Replace('/', Path.DirectorySeparatorChar));
-                Console.WriteLine($"\n── {repo.Path} ──────────────────────────────");
+                CliOutput.Header($"\n── {repo.Path} ──────────────────────────────");
 
                 if (!Directory.Exists(Path.Combine(repoDir, ".git"))
                     && !File.Exists(Path.Combine(repoDir, ".git")))
                 {
-                    Console.Error.WriteLine($"  ⚠  Skipping {repo.Path} — no .git found.");
+                    CliOutput.Warning($"  ⚠  Skipping {repo.Path} — no .git found.");
                     continue;
                 }
 
@@ -112,16 +113,16 @@ public static class BumpCommand
                 var nextTag = TagFormatter.Resolve(tagFormat, nextVersion, repoName);
 
                 if (verbose || dryRun)
-                    Console.WriteLine($"  Current: {(latestTag ?? "none")}  →  Next: {nextTag}");
+                    CliOutput.Info($"  Current: {(latestTag ?? "none")}  →  Next: {nextTag}");
 
                 if (!dryRun)
                 {
                     GitTagger.CreateTag(repoDir, nextTag);
-                    Console.WriteLine($"  ✓ Tagged {nextTag}");
+                    CliOutput.Success($"  ✓ Tagged {nextTag}");
                 }
                 else
                 {
-                    Console.WriteLine("  (dry-run — no tag created)");
+                    CliOutput.Info("  (dry-run — no tag created)");
                 }
             }
 

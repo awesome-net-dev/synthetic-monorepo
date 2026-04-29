@@ -26,7 +26,7 @@ public static class OnOffCommand
 
             if (configPath is null)
             {
-                Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
+                CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
                 return (int)ExitCode.ConfigNotFound;
             }
 

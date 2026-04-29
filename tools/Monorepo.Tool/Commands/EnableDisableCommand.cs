@@ -33,7 +33,7 @@ public static class EnableDisableCommand
 
             if (configPath is null)
             {
-                Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
+                CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
                 return (int)ExitCode.ConfigNotFound;
             }
 
@@ -43,7 +43,7 @@ public static class EnableDisableCommand
 
             if (mapping is null)
             {
-                Console.Error.WriteLine(
+                CliOutput.Error(
                     $"Error: no mapping for '{pkg}' in {configPath}. " +
                     "Run 'monorepo status' to see the list.");
                 return (int)ExitCode.InvalidInput;
@@ -51,13 +51,13 @@ public static class EnableDisableCommand
 
             if (mapping.Enabled == setTo)
             {
-                Console.WriteLine($"'{mapping.PackageId}' already Enabled={setTo}. No change.");
+                CliOutput.Info($"'{mapping.PackageId}' already Enabled={setTo}. No change.");
                 return 0;
             }
 
             mapping.Enabled = setTo;
             ConfigSerializer.Save(config, configPath);
-            Console.WriteLine($"Set Enabled={setTo} for '{mapping.PackageId}'. " +
+            CliOutput.Success($"Set Enabled={setTo} for '{mapping.PackageId}'. " +
                               "Run 'monorepo generate' to regenerate the overlay.");
             return 0;
         });
