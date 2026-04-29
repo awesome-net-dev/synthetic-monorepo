@@ -55,6 +55,7 @@ public static class SyncCommand
             var pulled = 0;
             var skipped = 0;
             var pullFailed = 0;
+            var upToDate = 0;
 
             foreach (var r in pullResults)
             {
@@ -69,7 +70,10 @@ public static class SyncCommand
                     pullFailed++;
                 }
                 else if (r.Stdout.Contains("Already up to date", StringComparison.OrdinalIgnoreCase))
+                {
                     CliOutput.Muted($"  ✓ {r.RepoPath}  Already up to date.");
+                    upToDate++;
+                }
                 else
                 {
                     CliOutput.Success($"  ✓ {r.RepoPath}  {r.Stdout.Split('\n')[0]}");
@@ -91,7 +95,7 @@ public static class SyncCommand
             CliOutput.Muted($"  Overlay up to date. {refresh.Total} mappings active.");
 
             Console.WriteLine();
-            CliOutput.Info($"Done. {pulled} repo(s) updated, {skipped} skipped." +
+            CliOutput.Info($"Done. {pulled} repo(s) updated, {upToDate} already up to date, {skipped} skipped." +
                 (pullFailed > 0 ? $" {pullFailed} failed." : ""));
 
             return pullFailed > 0 ? (int)ExitCode.GeneralError : 0;
