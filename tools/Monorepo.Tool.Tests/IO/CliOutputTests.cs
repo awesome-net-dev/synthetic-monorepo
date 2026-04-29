@@ -9,10 +9,9 @@ public class CliOutputTests
     public void Success_writes_to_stdout()
     {
         var writer = new StringWriter();
-        var prev = Console.Out;
-        Console.SetOut(writer);
+        CliOutput.TestOut = writer;
         try   { CliOutput.Success("hello green"); }
-        finally { Console.SetOut(prev); }
+        finally { CliOutput.TestOut = null; }
         Assert.Contains("hello green", writer.ToString());
     }
 
@@ -20,10 +19,9 @@ public class CliOutputTests
     public void Error_writes_to_stderr()
     {
         var writer = new StringWriter();
-        var prev = Console.Error;
-        Console.SetError(writer);
+        CliOutput.TestErr = writer;
         try   { CliOutput.Error("bad thing"); }
-        finally { Console.SetError(prev); }
+        finally { CliOutput.TestErr = null; }
         Assert.Contains("bad thing", writer.ToString());
     }
 
@@ -31,10 +29,9 @@ public class CliOutputTests
     public void Info_writes_plain_to_stdout()
     {
         var writer = new StringWriter();
-        var prev = Console.Out;
-        Console.SetOut(writer);
+        CliOutput.TestOut = writer;
         try   { CliOutput.Info("plain line"); }
-        finally { Console.SetOut(prev); }
+        finally { CliOutput.TestOut = null; }
         Assert.Contains("plain line", writer.ToString());
     }
 
