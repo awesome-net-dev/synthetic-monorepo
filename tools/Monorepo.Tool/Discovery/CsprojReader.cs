@@ -43,6 +43,31 @@ public static class CsprojReader
             .ToList();
     }
 
+    /// <summary>
+    /// Returns all PackageReference Include values AND their Version attributes from top-level
+    /// ItemGroup elements. Skips entries with PrivateAssets="all" or missing/empty Version.
+    /// Case-insensitive dedup on Id.
+    /// </summary>
+    public static IReadOnlyList<(string Id, string Version)> ReadPackageReferencesWithVersions(
+        string csprojPath)
+    {
+        var doc  = LoadXml(csprojPath);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<(string Id, string Version)>();
+
+        foreach (var el in (doc.Root?.Elements("ItemGroup") ?? []).Elements("PackageReference"))
+        {
+            if (!IsRuntimeReference(el)) continue;
+            var id      = el.Attribute("Include")?.Value ?? "";
+            var version = el.Attribute("Version")?.Value ?? "";
+            if (id.Length == 0 || version.Length == 0) continue;
+            if (!seen.Add(id)) continue;
+            result.Add((id, version));
+        }
+
+        return result;
+    }
+
     private static bool IsRuntimeReference(XElement el)
     {
         var privateAssets = el.Attribute("PrivateAssets")?.Value

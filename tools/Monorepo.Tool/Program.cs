@@ -44,6 +44,7 @@ public static class Program
             StatusCommand.Build(),
             EnableDisableCommand.BuildEnable(),
             EnableDisableCommand.BuildDisable(),
+            CpmCommand.Build(),
         };
 
         root.SetAction(_ =>
