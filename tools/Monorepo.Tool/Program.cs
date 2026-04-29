@@ -45,6 +45,7 @@ public static class Program
             EnableDisableCommand.BuildEnable(),
             EnableDisableCommand.BuildDisable(),
             CpmCommand.Build(),
+            ReleaseCommand.Build()
         };
 
         root.SetAction(_ =>
