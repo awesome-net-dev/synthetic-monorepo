@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Invocation;
 using System.Diagnostics;
 using Monorepo.Tool.Release;
 using Monorepo.Tool.Serialization;
@@ -34,12 +33,18 @@ public static class ReleaseCommand
         {
             Description = "Explicit path to monorepo.json."
         };
+		var tagFormatOpt = new Option<string>("--tag-format")
+        {
+        	DefaultValueFactory = _ => "v{version}",
+            Description = "Tag name template. Supports {version} and {repo} placeholders, " +
+            			  "e.g. 'v{version}' (default), '{repo}/v{version}', 'release-{version}'."
+        };
 
         var cmd = new Command("release",
             "Prepare a release for one or more managed repos: bumps version, " +
             "writes CHANGELOG.md, creates a git tag.")
         {
-            repoOpt, bumpOpt, dryRunOpt, verboseOpt, configOpt,
+            repoOpt, bumpOpt, dryRunOpt, verboseOpt, tagFormatOpt, configOpt,
         };
 
         cmd.SetAction(parseResult =>
@@ -49,6 +54,14 @@ public static class ReleaseCommand
             var dryRun = parseResult.GetValue(dryRunOpt);
             var verbose = parseResult.GetValue(verboseOpt);
             var configFile = parseResult.GetValue(configOpt);
+            var tagFormat  = parseResult.GetValue(tagFormatOpt)!;
+
+			if (!tagFormat.Contains("{version}", StringComparison.Ordinal))
+            {
+                Console.Error.WriteLine("Error: --tag-format must contain the {version} placeholder.");
+                return (int)IO.ExitCode.InvalidInput;
+            }
+
             var configPath = configFile?.FullName
                              ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
 
@@ -88,7 +101,9 @@ public static class ReleaseCommand
                     continue;
                 }
 
-                var latestTag = GitLogReader.GetLatestTag(repoDir);
+                var repoName   = Path.GetFileName(repoDir);
+                var tagGlob    = BuildTagGlob(tagFormat, repoName);
+                var latestTag  = GitLogReader.GetLatestTag(repoDir, tagGlob);
                 var rawCommits = GitLogReader.GetCommitsSinceTag(repoDir, latestTag);
 
                 var parsed = rawCommits
@@ -101,7 +116,7 @@ public static class ReleaseCommand
                     foreach (var c in rawCommits)
                         Console.WriteLine($"  [{c.Hash[..7]}] {c.Subject}");
 
-                var currentVersion = latestTag?.TrimStart('v') ?? "0.0.0";
+                var currentVersion = ExtractVersion(latestTag, tagFormat, repoName) ?? "0.0.0";
 
                 var bump = bumpArg.ToLowerInvariant() switch
                 {
@@ -113,7 +128,8 @@ public static class ReleaseCommand
 
                 var nextVersion = SemVerBumper.Bump(currentVersion, bump);
 
-                Console.WriteLine($"  Current: {(latestTag ?? "none")}  →  Next: v{nextVersion}  ({bump})");
+                var nextTag = ResolveTag(tagFormat, nextVersion, repoName);
+                Console.WriteLine($"  Current: {(latestTag ?? "none")}  →  Next: {nextTag}  ({bump})");
                 Console.WriteLine($"  {rawCommits.Count} commit(s) since last tag ({parsed.Count} conventional)");
 
                 PrintReleaseNotes(parsed);
@@ -121,8 +137,8 @@ public static class ReleaseCommand
                 if (!dryRun)
                 {
                     ChangelogWriter.Write(repoDir, nextVersion, parsed, DateTime.Today, dryRun: false);
-                    CreateGitTag(repoDir, nextVersion);
-                    Console.WriteLine($"  ✓ Tagged v{nextVersion} and updated CHANGELOG.md");
+                    CreateGitTag(repoDir, nextTag);
+                    Console.WriteLine($"  ✓ Tagged {nextTag} and updated CHANGELOG.md");
                 }
                 else
                 {
@@ -151,9 +167,8 @@ public static class ReleaseCommand
         }
     }
 
-    private static void CreateGitTag(string repoPath, string version)
+    private static void CreateGitTag(string repoPath, string tag)
     {
-        var tag = $"v{version}";
         var psi = new ProcessStartInfo("git")
         {
             WorkingDirectory = repoPath,
@@ -171,5 +186,25 @@ public static class ReleaseCommand
         proc.WaitForExit();
         if (proc.ExitCode != 0)
             Console.Error.WriteLine($"  Warning: git tag failed — {stderr.Trim()}");
+    }
+
+    private static string ResolveTag(string format, string version, string repoName)
+        => format.Replace("{version}", version).Replace("{repo}", repoName);
+
+    private static string BuildTagGlob(string format, string repoName)
+        => format.Replace("{version}", "*").Replace("{repo}", repoName);
+
+    private static string? ExtractVersion(string? tag, string format, string repoName)
+    {
+        if (tag is null) return null;
+        var vIdx = format.IndexOf("{version}", StringComparison.Ordinal);
+        var prefix = format[..vIdx].Replace("{repo}", repoName);
+        var suffix = format[(vIdx + "{version}".Length)..].Replace("{repo}", repoName);
+        if (!tag.StartsWith(prefix, StringComparison.Ordinal)
+            || !tag.EndsWith(suffix, StringComparison.Ordinal))
+            return tag;
+        var start = prefix.Length;
+        var end   = tag.Length - suffix.Length;
+        return start <= end ? tag[start..end] : tag;
     }
 }
