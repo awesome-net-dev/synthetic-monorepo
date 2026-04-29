@@ -1,4 +1,5 @@
 // tools/Monorepo.Tool.Tests/Commands/GitCommandTests.cs
+using Monorepo.Tool.IO;
 using Monorepo.Tool.Model;
 using Monorepo.Tool.Serialization;
 using Xunit;
@@ -10,11 +11,11 @@ public class GitCommandTests
     // ── pull ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Pull_returns_GeneralError_when_config_path_invalid()
+    public async Task Pull_returns_ConfigNotFound_when_config_path_missing()
     {
         using var fx = new TempRepoFixture();
         var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
-        Assert.Equal(1, await Program.Main(["pull", "--config", missingConfig]));
+        Assert.Equal((int)ExitCode.ConfigNotFound, await Program.Main(["pull", "--config", missingConfig]));
     }
 
     [Fact]
@@ -29,11 +30,11 @@ public class GitCommandTests
     // ── push ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Push_returns_GeneralError_when_config_path_invalid()
+    public async Task Push_returns_ConfigNotFound_when_config_path_missing()
     {
         using var fx = new TempRepoFixture();
         var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
-        Assert.Equal(1, await Program.Main(["push", "--config", missingConfig]));
+        Assert.Equal((int)ExitCode.ConfigNotFound, await Program.Main(["push", "--config", missingConfig]));
     }
 
     [Fact]
@@ -45,6 +46,16 @@ public class GitCommandTests
             ["push", "--repo", "no-such-repo", "--config", configPath]));
     }
 
+    // ── fetch ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Fetch_returns_ConfigNotFound_when_config_path_missing()
+    {
+        using var fx = new TempRepoFixture();
+        var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
+        Assert.Equal((int)ExitCode.ConfigNotFound, await Program.Main(["fetch", "--config", missingConfig]));
+    }
+
     [Fact]
     public async Task Fetch_returns_InvalidInput_when_repo_filter_not_found()
     {
@@ -54,24 +65,14 @@ public class GitCommandTests
             ["fetch", "--repo", "no-such-repo", "--config", configPath]));
     }
 
-    // ── fetch ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Fetch_returns_GeneralError_when_config_path_invalid()
-    {
-        using var fx = new TempRepoFixture();
-        var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
-        Assert.Equal(1, await Program.Main(["fetch", "--config", missingConfig]));
-    }
-
     // ── sync ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Sync_returns_GeneralError_when_config_path_invalid()
+    public async Task Sync_returns_ConfigNotFound_when_config_path_missing()
     {
         using var fx = new TempRepoFixture();
         var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
-        Assert.Equal(1, await Program.Main(["sync", "--config", missingConfig]));
+        Assert.Equal((int)ExitCode.ConfigNotFound, await Program.Main(["sync", "--config", missingConfig]));
     }
 
     [Fact]

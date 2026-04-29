@@ -35,7 +35,7 @@ public static class SyncCommand
             var configPath = configFile?.FullName
                              ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
 
-            if (configPath is null)
+            if (configPath is null || !File.Exists(configPath))
             {
                 CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
                 return (int)ExitCode.ConfigNotFound;
@@ -85,7 +85,16 @@ public static class SyncCommand
 
             // Phase 2: refresh overlay
             CliOutput.Header("Refreshing overlay...");
-            var refresh = GenerateCommand.RunRefresh(configPath, dryRun);
+            GenerateCommand.RefreshResult refresh;
+            try
+            {
+                refresh = GenerateCommand.RunRefresh(configPath, dryRun);
+            }
+            catch (Exception ex)
+            {
+                CliOutput.Error($"  Overlay refresh failed: {ex.Message}");
+                return (int)ExitCode.GeneralError;
+            }
 
             foreach (var w in refresh.Warnings)
                 CliOutput.Warning($"  ⚠  {w}");

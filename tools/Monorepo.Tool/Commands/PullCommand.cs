@@ -39,7 +39,7 @@ public static class PullCommand
             var configPath = configFile?.FullName
                 ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
 
-            if (configPath is null)
+            if (configPath is null || !File.Exists(configPath))
             {
                 CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
                 return (int)ExitCode.ConfigNotFound;

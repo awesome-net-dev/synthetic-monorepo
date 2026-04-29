@@ -58,7 +58,7 @@ public static class WatchCommand
             var configPath = configFile?.FullName
                              ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
 
-            if (configPath is null)
+            if (configPath is null || !File.Exists(configPath))
             {
                 CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
                 return (int)ExitCode.ConfigNotFound;
@@ -100,18 +100,21 @@ public static class WatchCommand
 
         CancellationTokenSource? debounceCts = null;
         var debounceLock = new object();
+        Task? lastRefreshTask = null;
 
         watcher.FileChanged += changedPath =>
         {
             lock (debounceLock)
             {
+                // Cancel the previous debounce timer but do NOT dispose here — the linked token
+                // may still be observed by the continuation that was scheduled asynchronously.
+                // Ownership transfers to the cleanup block after the main loop exits.
                 debounceCts?.Cancel();
-                debounceCts?.Dispose();
                 var linked = CancellationTokenSource.CreateLinkedTokenSource(appCts.Token);
                 debounceCts = linked;
                 var token = linked.Token;
 
-                Task.Delay(debounceMs, token).ContinueWith(_ =>
+                lastRefreshTask = Task.Delay(debounceMs, token).ContinueWith(_ =>
                 {
                     if (token.IsCancellationRequested) return;
                     var rel = Path.GetRelativePath(backendRoot, changedPath);
@@ -139,6 +142,25 @@ public static class WatchCommand
         catch (OperationCanceledException) { }
 
         Console.CancelKeyPress -= cancelHandler;
+
+        // Await any in-flight refresh that passed the IsCancellationRequested check before
+        // the token was cancelled, so it completes before we dispose the watcher.
+        Task? pending;
+        lock (debounceLock) { pending = lastRefreshTask; }
+        if (pending is not null)
+        {
+            try { await pending.WaitAsync(TimeSpan.FromSeconds(5)); }
+            catch { }
+        }
+
+        // Dispose the live debounce CTS now that no continuation can observe it.
+        lock (debounceLock)
+        {
+            debounceCts?.Cancel();
+            debounceCts?.Dispose();
+            debounceCts = null;
+        }
+
         Console.WriteLine();
         CliOutput.Muted("Stopped.");
         return 0;

@@ -31,7 +31,7 @@ namespace Monorepo.Tool.Generation;
 ///     Producer guard: the ItemGroup's Condition skips the producing csproj itself.
 ///     TFM guard:      same condition as Layer 1b — only net8+ projects get the swap.
 /// </summary>
-public static class OverlayWriter
+public static partial class OverlayWriter
 {
     /// <summary>Item type name used to snapshot @(PackageReference) before removal.</summary>
     private const string SnapshotItemType = "_MonorepoOriginalPackageReference";
@@ -158,8 +158,11 @@ public static class OverlayWriter
                 new XAttribute("Include", projectRef)));
     }
 
+    [GeneratedRegex(@"[^A-Za-z0-9]")]
+    private static partial Regex InvalidCharsRegex();
+
     private static string ToSafeName(string packageId) =>
-        Regex.Replace(packageId, @"[^A-Za-z0-9]", "_");
+        InvalidCharsRegex().Replace(packageId, "_");
 
     private static string RenderXml(XDocument doc)
     {

@@ -22,6 +22,8 @@ public static class CliOutput
     public static void Muted(string message)   => Write(message, ConsoleColor.DarkGray);
     public static void Info(string message)    => (TestOut ?? Console.Out).WriteLine(message);
 
+    // NOTE: Console.ForegroundColor is process-global. These methods are NOT thread-safe.
+    // Callers on background threads (e.g. watch debounce) may interleave color sequences.
     static void Write(string message, ConsoleColor color)
     {
         var writer = TestOut ?? Console.Out;

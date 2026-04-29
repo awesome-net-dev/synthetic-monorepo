@@ -1,5 +1,6 @@
 using Monorepo.Tool.Commands;
 using Monorepo.Tool.IO;
+using Monorepo.Tool.Model;
 using Monorepo.Tool.Serialization;
 using Xunit;
 
@@ -8,12 +9,11 @@ namespace Monorepo.Tool.Tests.Commands;
 public class WatchCommandTests
 {
     [Fact]
-    public async Task Watch_returns_error_when_config_directory_not_found()
+    public async Task Watch_returns_ConfigNotFound_when_config_path_missing()
     {
         using var fx = new TempRepoFixture();
-        // nonexistent/ directory → DirectoryNotFoundException → GeneralError (1)
         var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
-        Assert.Equal(1, await Program.Run(
+        Assert.Equal((int)ExitCode.ConfigNotFound, await Program.Run(
             ["watch", "--config", missingConfig],
             watcherFactory: _ => new NoOpFileWatcher()));
     }
@@ -39,8 +39,8 @@ public class WatchCommandTests
             ["watch", "--config", configPath, "--debounce", "50"],
             watcherFactory: _ => fakeWatcher));
 
-        // Give the command time to start
-        await Task.Delay(100);
+        // Wait until the watcher is started (deterministic — no arbitrary sleep).
+        await fakeWatcher.WaitForStart().WaitAsync(TimeSpan.FromSeconds(5));
 
         // Add a new csproj as a producer in repo-b
         var repoB = fx.CreateRepo("backend/repo-b");
@@ -57,15 +57,20 @@ public class WatchCommandTests
         // Trigger a fake file-change event
         fakeWatcher.Trigger(Path.Combine(repoB, "src", "B.csproj"));
 
-        // Wait for debounce + refresh to complete (50ms debounce + processing)
-        await Task.Delay(500);
+        // Poll for the refresh result rather than sleeping for a fixed duration.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        MonorepoConfig cfg;
+        do
+        {
+            await Task.Delay(50);
+            cfg = ConfigSerializer.Load(configPath);
+        }
+        while (!cfg.Mappings.Any(m => m.PackageId == "B.Lib") && DateTime.UtcNow < deadline);
 
         // Cancel the watch loop
         fakeWatcher.Cancel();
         await watchTask;
 
-        // Overlay should have been refreshed — B.Lib mapping should now exist
-        var cfg = ConfigSerializer.Load(configPath);
         Assert.Contains(cfg.Mappings, m => m.PackageId == "B.Lib");
     }
 }
@@ -82,10 +87,12 @@ internal sealed class NoOpFileWatcher : IFileWatcher
 internal sealed class ManualFileWatcher : IFileWatcher, IHasCancellation
 {
     private readonly CancellationTokenSource _cts = new();
+    private readonly TaskCompletionSource _started = new();
     public event Action<string>? FileChanged;
     public CancellationToken CancellationToken => _cts.Token;
 
-    public void Start() { }
+    public void Start() => _started.TrySetResult();
+    public Task WaitForStart() => _started.Task;
     public void Trigger(string path) => FileChanged?.Invoke(path);
     public void Cancel() => _cts.Cancel();
     public void Dispose() => _cts.Dispose();

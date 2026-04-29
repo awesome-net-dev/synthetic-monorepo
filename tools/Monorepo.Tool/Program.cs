@@ -19,6 +19,11 @@ public static class Program
             Console.Error.WriteLine($"Error: {ex.Message}");
             return (int)ExitCode.ConfigNotFound;
         }
+        catch (DirectoryNotFoundException ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return (int)ExitCode.ConfigNotFound;
+        }
         catch (System.Text.Json.JsonException ex)
         {
             Console.Error.WriteLine($"Error: monorepo.json is corrupt — {ex.Message}");

@@ -10,7 +10,11 @@ public sealed record RepoResult(
     int ExitCode)
 {
     public bool Success => ExitCode == 0;
-    public string Output => Stdout.Length > 0 ? Stdout : Stderr;
+    // Concat both streams when both have content — many git commands write progress to stderr
+    // and results to stdout simultaneously, so dropping either loses diagnostic information.
+    public string Output => (Stdout.Length > 0 && Stderr.Length > 0)
+        ? $"{Stdout}\n{Stderr}"
+        : Stdout.Length > 0 ? Stdout : Stderr;
 }
 
 public static class GitMultiRepoRunner
@@ -62,19 +66,26 @@ public static class GitMultiRepoRunner
         foreach (var arg in args[1..])
             psi.ArgumentList.Add(arg);
 
-        using var proc = Process.Start(psi)!;
-        try
+        Process? proc;
+        try { proc = Process.Start(psi); }
+        catch (Exception ex) { return new RepoResult(repo.Path, "", ex.Message, -1); }
+        if (proc is null) return new RepoResult(repo.Path, "", "could not start process", -1);
+
+        using (proc)
         {
-            var stdoutTask = proc.StandardOutput.ReadToEndAsync(ct);
-            var stderrTask = proc.StandardError.ReadToEndAsync(ct);
-            await Task.WhenAll(stdoutTask, stderrTask);
-            await proc.WaitForExitAsync(ct);
-            return new RepoResult(repo.Path, stdoutTask.Result.TrimEnd(), stderrTask.Result.TrimEnd(), proc.ExitCode);
-        }
-        catch (OperationCanceledException)
-        {
-            try { proc.Kill(entireProcessTree: true); } catch { }
-            throw;
+            try
+            {
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync(ct);
+                var stderrTask = proc.StandardError.ReadToEndAsync(ct);
+                await Task.WhenAll(stdoutTask, stderrTask);
+                await proc.WaitForExitAsync(ct);
+                return new RepoResult(repo.Path, stdoutTask.Result.TrimEnd(), stderrTask.Result.TrimEnd(), proc.ExitCode);
+            }
+            catch (OperationCanceledException)
+            {
+                try { proc.Kill(entireProcessTree: true); } catch { }
+                throw;
+            }
         }
     }
 }
