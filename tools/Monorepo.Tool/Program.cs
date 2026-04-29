@@ -48,7 +48,8 @@ public static class Program
             ReleaseCommand.Build(),
             CleanCommand.Build(),
             BumpCommand.Build(),
-            CloneCommand.Build()
+            CloneCommand.Build(),
+            ChangesCommand.Build(),
         };
 
         root.SetAction(_ =>

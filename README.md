@@ -156,6 +156,7 @@ When the sentinel is absent, the `Condition="Exists(...)"` on every import is fa
 | `monorepo bump patch\|minor\|major` | Create a version tag without writing a changelog |
 | `monorepo clean` | Delete all `bin/` and `obj/` directories across all repos |
 | `monorepo clone` | Clone all repos listed in `monorepo.json` that are missing locally |
+| `monorepo changes` | Show uncommitted changes across all repos (`git status --short`) |
 
 Every command accepts `--dry-run` to preview changes without writing anything, and `--help` for full option details.
 
