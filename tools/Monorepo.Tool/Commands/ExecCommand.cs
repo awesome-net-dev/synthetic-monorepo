@@ -1,5 +1,5 @@
 using System.CommandLine;
-using System.Diagnostics;
+using Monorepo.Tool.IO;
 using Monorepo.Tool.Serialization;
 
 namespace Monorepo.Tool.Commands;
@@ -13,17 +13,18 @@ public static class ExecCommand
             Arity = ArgumentArity.OneOrMore,
             Description = "Command and arguments to run in each repo (pass after --).",
         };
-
         var repoOpt = new Option<string?>("--repo")
         {
             Description = "Path of the target repo relative to backendRoot. Defaults to all repos."
         };
-
+        var parallelOpt = new Option<bool>("--parallel")
+        {
+            Description = "Run the command in all repos concurrently."
+        };
         var allOpt = new Option<bool>("--all")
         {
             Description = "Show a header for every repo, even those that produce no output."
         };
-
         var configOpt = new Option<FileInfo?>("--config")
         {
             Description = "Explicit path to monorepo.json. Defaults to walking up from CWD."
@@ -33,29 +34,29 @@ public static class ExecCommand
             "Run an arbitrary command in every repo. " +
             "Repos that produce no output are hidden unless --all is passed.")
         {
-            commandArg, repoOpt, allOpt, configOpt,
+            commandArg, repoOpt, parallelOpt, allOpt, configOpt,
         };
 
         cmd.SetAction(parseResult =>
         {
-            var args = parseResult.GetValue(commandArg)!;
+            var args       = parseResult.GetValue(commandArg)!;
             var repoFilter = parseResult.GetValue(repoOpt);
-            var showAll = parseResult.GetValue(allOpt);
+            var parallel   = parseResult.GetValue(parallelOpt);
+            var showAll    = parseResult.GetValue(allOpt);
             var configFile = parseResult.GetValue(configOpt);
-
             var configPath = configFile?.FullName
                              ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
 
             if (configPath is null)
             {
-                Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
-                return (int)IO.ExitCode.ConfigNotFound;
+                CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
+                return (int)ExitCode.ConfigNotFound;
             }
 
             var config = ConfigSerializer.Load(configPath);
             var backendRoot = Path.GetFullPath(
                 Path.Combine(Path.GetDirectoryName(configPath)!,
-                             config.BackendRoot.Replace('/', Path.DirectorySeparatorChar)));
+                    config.BackendRoot.Replace('/', Path.DirectorySeparatorChar)));
 
             var targetRepos = config.Repos
                 .Where(r => repoFilter is null
@@ -64,63 +65,45 @@ public static class ExecCommand
 
             if (targetRepos.Count == 0)
             {
-                Console.Error.WriteLine(repoFilter is null
+                CliOutput.Error(repoFilter is null
                     ? "No repos found in config."
                     : $"Repo '{repoFilter}' not found in config.");
-                return (int)IO.ExitCode.InvalidInput;
+                return (int)ExitCode.InvalidInput;
             }
 
+            var results = GitMultiRepoRunner
+                .RunAsync(targetRepos, backendRoot, args, parallel)
+                .GetAwaiter().GetResult();
+
             var failed = 0;
-
-            foreach (var repo in targetRepos)
+            foreach (var r in results)
             {
-                var repoDir = Path.Combine(backendRoot, repo.Path.Replace('/', Path.DirectorySeparatorChar));
-
-                if (!Directory.Exists(repoDir))
+                if (r.ExitCode == -1)
                 {
-                    Console.Error.WriteLine($"  ⚠  {repo.Path} — directory not found, skipping.");
+                    CliOutput.Warning($"  ⚠  {r.RepoPath} — directory not found, skipping.");
                     failed++;
                     continue;
                 }
 
-                var psi = new ProcessStartInfo(args[0])
+                if (r.Output.Length == 0 && !showAll)
                 {
-                    WorkingDirectory = repoDir,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                };
-                foreach (var arg in args[1..])
-                    psi.ArgumentList.Add(arg);
-
-                using var proc = Process.Start(psi)!;
-                var stdout = proc.StandardOutput.ReadToEnd().TrimEnd();
-                var stderr = proc.StandardError.ReadToEnd().TrimEnd();
-                proc.WaitForExit();
-
-                var output = stdout.Length > 0 && stderr.Length > 0
-                    ? $"{stdout}\n{stderr}"
-                    : stdout.Length > 0 ? stdout : stderr;
-
-                if (output.Length == 0 && !showAll)
-                {
-                    if (proc.ExitCode != 0) failed++;
+                    if (!r.Success) failed++;
                     continue;
                 }
 
-                Console.WriteLine($"\n── {repo.Path}");
-                if (output.Length > 0)
-                    Console.WriteLine(output);
+                CliOutput.Header($"\n── {r.RepoPath}");
+                if (r.Output.Length > 0)
+                    Console.WriteLine(r.Output);
 
-                if (proc.ExitCode != 0)
+                if (!r.Success)
                 {
-                    Console.Error.WriteLine($"  exited with code {proc.ExitCode}");
+                    CliOutput.Error($"  exited with code {r.ExitCode}");
                     failed++;
                 }
             }
 
             Console.WriteLine();
-            return failed > 0 ? (int)IO.ExitCode.GeneralError : 0;
+            return failed > 0 ? (int)ExitCode.GeneralError : 0;
         });
 
         return cmd;
