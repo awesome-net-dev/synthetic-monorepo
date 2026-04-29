@@ -18,7 +18,7 @@ public static class PushCommand
         };
         var allOpt = new Option<bool>("--all")
         {
-            Description = "Show repos that had nothing to push."
+            Description = "Show a line for every repo, including those with nothing to push."
         };
         var configOpt = new Option<FileInfo?>("--config")
         {
@@ -36,9 +36,8 @@ public static class PushCommand
             var parallel   = parseResult.GetValue(parallelOpt);
             var showAll    = parseResult.GetValue(allOpt);
             var configFile = parseResult.GetValue(configOpt);
-            var configPath = configFile is not null
-                ? (File.Exists(configFile.FullName) ? configFile.FullName : null)
-                : ConfigSerializer.Locate(Directory.GetCurrentDirectory());
+            var configPath = configFile?.FullName
+                ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
 
             if (configPath is null)
             {
@@ -64,7 +63,7 @@ public static class PushCommand
                 return (int)ExitCode.InvalidInput;
             }
 
-            CliOutput.Header("Pushing all repos...");
+            CliOutput.Header(repoFilter is null ? "Pushing all repos..." : $"Pushing {repoFilter}...");
             var results = GitMultiRepoRunner
                 .RunAsync(targetRepos, backendRoot, ["git", "push"], parallel)
                 .GetAwaiter().GetResult();

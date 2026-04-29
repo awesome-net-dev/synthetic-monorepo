@@ -36,9 +36,8 @@ public static class PullCommand
             var parallel   = parseResult.GetValue(parallelOpt);
             var showAll    = parseResult.GetValue(allOpt);
             var configFile = parseResult.GetValue(configOpt);
-            var configPath = configFile is not null
-                ? (File.Exists(configFile.FullName) ? configFile.FullName : null)
-                : ConfigSerializer.Locate(Directory.GetCurrentDirectory());
+            var configPath = configFile?.FullName
+                ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
 
             if (configPath is null)
             {
@@ -64,7 +63,7 @@ public static class PullCommand
                 return (int)ExitCode.InvalidInput;
             }
 
-            CliOutput.Header("Pulling all repos...");
+            CliOutput.Header(repoFilter is null ? "Pulling all repos..." : $"Pulling {repoFilter}...");
             var results = GitMultiRepoRunner
                 .RunAsync(targetRepos, backendRoot, ["git", "pull"], parallel)
                 .GetAwaiter().GetResult();

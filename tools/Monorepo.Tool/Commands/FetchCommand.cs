@@ -36,9 +36,8 @@ public static class FetchCommand
             var parallel   = parseResult.GetValue(parallelOpt);
             var showAll    = parseResult.GetValue(allOpt);
             var configFile = parseResult.GetValue(configOpt);
-            var configPath = configFile is not null
-                ? (File.Exists(configFile.FullName) ? configFile.FullName : null)
-                : ConfigSerializer.Locate(Directory.GetCurrentDirectory());
+            var configPath = configFile?.FullName
+                ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
 
             if (configPath is null)
             {
@@ -74,12 +73,14 @@ public static class FetchCommand
                     CliOutput.Warning($"  ⚠  {r.RepoPath}  {r.Stderr}");
                 else if (!r.Success)
                     CliOutput.Error($"  ✗ {r.RepoPath}  {r.Stderr}");
+                else if (r.Output.Length > 0)
+                    CliOutput.Success($"  ✓ {r.RepoPath}  {r.Output.Split('\n')[0]}");
                 else if (showAll)
                     CliOutput.Muted($"  ✓ {r.RepoPath}");
             }
 
             var failed = results.Count(r => !r.Success && r.ExitCode != -1);
-            if (failed > 0) Console.WriteLine();
+            Console.WriteLine();
             return failed > 0 ? (int)ExitCode.GeneralError : 0;
         });
 

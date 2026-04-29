@@ -10,11 +10,11 @@ public class GitCommandTests
     // ── pull ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Pull_returns_ConfigNotFound_when_no_config()
+    public async Task Pull_returns_GeneralError_when_config_path_invalid()
     {
         using var fx = new TempRepoFixture();
         var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
-        Assert.Equal(3, await Program.Main(["pull", "--config", missingConfig]));
+        Assert.Equal(1, await Program.Main(["pull", "--config", missingConfig]));
     }
 
     [Fact]
@@ -29,21 +29,39 @@ public class GitCommandTests
     // ── push ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Push_returns_ConfigNotFound_when_no_config()
+    public async Task Push_returns_GeneralError_when_config_path_invalid()
     {
         using var fx = new TempRepoFixture();
         var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
-        Assert.Equal(3, await Program.Main(["push", "--config", missingConfig]));
+        Assert.Equal(1, await Program.Main(["push", "--config", missingConfig]));
+    }
+
+    [Fact]
+    public async Task Push_returns_InvalidInput_when_repo_filter_not_found()
+    {
+        using var fx = new TempRepoFixture();
+        var (_, configPath) = SetupMinimalConfig(fx);
+        Assert.Equal(2, await Program.Main(
+            ["push", "--repo", "no-such-repo", "--config", configPath]));
+    }
+
+    [Fact]
+    public async Task Fetch_returns_InvalidInput_when_repo_filter_not_found()
+    {
+        using var fx = new TempRepoFixture();
+        var (_, configPath) = SetupMinimalConfig(fx);
+        Assert.Equal(2, await Program.Main(
+            ["fetch", "--repo", "no-such-repo", "--config", configPath]));
     }
 
     // ── fetch ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Fetch_returns_ConfigNotFound_when_no_config()
+    public async Task Fetch_returns_GeneralError_when_config_path_invalid()
     {
         using var fx = new TempRepoFixture();
         var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
-        Assert.Equal(3, await Program.Main(["fetch", "--config", missingConfig]));
+        Assert.Equal(1, await Program.Main(["fetch", "--config", missingConfig]));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────
