@@ -1,3 +1,4 @@
+using Monorepo.Tool.IO;
 using Xunit;
 
 namespace Monorepo.Tool.Tests.Commands;
@@ -13,7 +14,7 @@ public class ProgramErrorTests
         {
             Directory.SetCurrentDirectory(fx.Root);
             var exit = await Program.Main(["status"]);
-            Assert.Equal((int)IO.ExitCode.ConfigNotFound, exit);
+            Assert.Equal((int)ExitCode.ConfigNotFound, exit);
         }
         finally
         {
