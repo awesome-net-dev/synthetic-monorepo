@@ -64,6 +64,28 @@ public class GitCommandTests
         Assert.Equal(1, await Program.Main(["fetch", "--config", missingConfig]));
     }
 
+    // ── sync ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Sync_returns_GeneralError_when_config_path_invalid()
+    {
+        using var fx = new TempRepoFixture();
+        var missingConfig = Path.Combine(fx.Root, "nonexistent", "monorepo.json");
+        Assert.Equal(1, await Program.Main(["sync", "--config", missingConfig]));
+    }
+
+    [Fact]
+    public async Task Sync_runs_without_error_on_local_repos()
+    {
+        using var fx = new TempRepoFixture();
+        var (_, configPath) = SetupMinimalConfig(fx);
+        // git pull will fail on repos with no remote — sync should complete the
+        // refresh phase and return GeneralError (1), not crash
+        var exit = await Program.Main(["sync", "--config", configPath]);
+        Assert.True(exit == 0 || exit == 1,
+            $"Expected 0 or 1, got {exit}");
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────
 
     static (string backendRoot, string configPath) SetupMinimalConfig(TempRepoFixture fx)

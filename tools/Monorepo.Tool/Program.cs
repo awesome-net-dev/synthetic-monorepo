@@ -53,7 +53,8 @@ public static class Program
             ExecCommand.Build(),
             PullCommand.Build(),
             PushCommand.Build(),
-            FetchCommand.Build()
+            FetchCommand.Build(),
+            SyncCommand.Build()
         };
 
         root.SetAction(_ =>
