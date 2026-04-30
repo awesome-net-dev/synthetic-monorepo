@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Monorepo.Tool.Discovery;
 using Monorepo.Tool.Generation;
+using Monorepo.Tool.IO;
 using Monorepo.Tool.Serialization;
 
 namespace Monorepo.Tool.Commands;
@@ -47,8 +48,8 @@ public static class CpmCommand
 
             if (configPath is null)
             {
-                Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
-                return (int)IO.ExitCode.ConfigNotFound;
+                CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
+                return (int)ExitCode.ConfigNotFound;
             }
 
             var config = ConfigSerializer.Load(configPath);
@@ -56,7 +57,7 @@ public static class CpmCommand
                 Path.Combine(Path.GetDirectoryName(configPath)!,
                              config.BackendRoot.Replace('/', Path.DirectorySeparatorChar)));
 
-            Console.WriteLine("Scanning PackageReference versions...");
+            CliOutput.Header("Scanning PackageReference versions...");
 
             var allRefs = new Dictionary<string, List<(string Version, string Csproj)>>(
                 StringComparer.OrdinalIgnoreCase);
@@ -75,14 +76,14 @@ public static class CpmCommand
                         allRefs[id].Add((version, csproj));
 
                         if (verbose)
-                            Console.WriteLine($"  {id} {version} <- {csproj}");
+                            CliOutput.Muted($"  {id} {version} <- {csproj}");
                     }
                 }
             }
 
             if (allRefs.Count == 0)
             {
-                Console.WriteLine("No versioned PackageReferences found. Nothing to do.");
+                CliOutput.Info("No versioned PackageReferences found. Nothing to do.");
                 return 0;
             }
 
@@ -97,11 +98,11 @@ public static class CpmCommand
                 consolidated[id] = winner;
 
                 if (distinctVersions.Count > 1)
-                    Console.Error.WriteLine(
+                    CliOutput.Warning(
                         $"  Version conflict for '{id}': {string.Join(", ", distinctVersions)} — using {winner}");
             }
 
-            Console.WriteLine($"  {consolidated.Count} packages to centralise.");
+            CliOutput.Info($"  {consolidated.Count} packages to centralise.");
 
             CpmWriter.Write(backendRoot, consolidated, dryRun);
 
@@ -120,9 +121,9 @@ public static class CpmCommand
                 }
             }
 
-            Console.WriteLine($"Done. {processed} csproj(s) processed.");
+            CliOutput.Success($"Done. {processed} csproj(s) processed.");
             if (dryRun)
-                Console.WriteLine("(dry-run — no files were changed)");
+                CliOutput.Info("(dry-run — no files were changed)");
 
             return 0;
         });

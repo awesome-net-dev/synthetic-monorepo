@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Monorepo.Tool.IO;
 using Monorepo.Tool.Releases;
 using Monorepo.Tool.Serialization;
 
@@ -59,8 +60,8 @@ public static class ReleaseCommand
 
 			if (!tagFormat.Contains("{version}", StringComparison.Ordinal))
             {
-                Console.Error.WriteLine("Error: --tag-format must contain the {version} placeholder.");
-                return (int)IO.ExitCode.InvalidInput;
+                CliOutput.Error("Error: --tag-format must contain the {version} placeholder.");
+                return (int)ExitCode.InvalidInput;
             }
 
             var configPath = configFile?.FullName
@@ -68,8 +69,8 @@ public static class ReleaseCommand
 
             if (configPath is null)
             {
-                Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
-                return (int)IO.ExitCode.ConfigNotFound;
+                CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
+                return (int)ExitCode.ConfigNotFound;
             }
 
             var config = ConfigSerializer.Load(configPath);
@@ -84,21 +85,21 @@ public static class ReleaseCommand
 
             if (targetRepos.Count == 0)
             {
-                Console.Error.WriteLine(repoFilter is null
+                CliOutput.Error(repoFilter is null
                     ? "No repos found in config."
                     : $"Repo '{repoFilter}' not found in config.");
-                return (int)IO.ExitCode.InvalidInput;
+                return (int)ExitCode.InvalidInput;
             }
 
             foreach (var repo in targetRepos)
             {
                 var repoDir = Path.Combine(backendRoot, repo.Path.Replace('/', Path.DirectorySeparatorChar));
-                Console.WriteLine($"\n── {repo.Path} ──────────────────────────────");
+                CliOutput.Header($"\n── {repo.Path} ──────────────────────────────");
 
                 if (!Directory.Exists(Path.Combine(repoDir, ".git"))
                     && !File.Exists(Path.Combine(repoDir, ".git")))
                 {
-                    Console.Error.WriteLine($"  ⚠  Skipping {repo.Path} — no .git found (not an initialised git repo).");
+                    CliOutput.Warning($"  ⚠  Skipping {repo.Path} — no .git found (not an initialised git repo).");
                     continue;
                 }
 
@@ -115,7 +116,7 @@ public static class ReleaseCommand
 
                 if (verbose)
                     foreach (var c in rawCommits)
-                        Console.WriteLine($"  [{c.Hash[..7]}] {c.Subject}");
+                        CliOutput.Muted($"  [{c.Hash[..7]}] {c.Subject}");
 
                 var currentVersion = TagFormatter.ExtractVersion(latestTag, tagFormat, repoName) ?? "0.0.0";
 
@@ -130,8 +131,8 @@ public static class ReleaseCommand
                 var nextVersion = SemVerBumper.Bump(currentVersion, bump);
 
                 var nextTag = TagFormatter.Resolve(tagFormat, nextVersion, repoName);
-                Console.WriteLine($"  Current: {(latestTag ?? "none")}  →  Next: {nextTag}  ({bump})");
-                Console.WriteLine($"  {rawCommits.Count} commit(s) since last tag ({parsed.Count} conventional)");
+                CliOutput.Info($"  Current: {(latestTag ?? "none")}  →  Next: {nextTag}  ({bump})");
+                CliOutput.Info($"  {rawCommits.Count} commit(s) since last tag ({parsed.Count} conventional)");
 
                 PrintReleaseNotes(parsed);
 
@@ -139,11 +140,11 @@ public static class ReleaseCommand
                 {
                     ChangelogWriter.Write(repoDir, nextVersion, parsed, DateTime.Today, dryRun: false);
                     GitTagger.CreateTag(repoDir, nextTag);
-                    Console.WriteLine($"  ✓ Tagged {nextTag} and updated CHANGELOG.md");
+                    CliOutput.Success($"  ✓ Tagged {nextTag} and updated CHANGELOG.md");
                 }
                 else
                 {
-                    Console.WriteLine("  (dry-run — no changes made)");
+                    CliOutput.Info("  (dry-run — no changes made)");
                 }
             }
 
@@ -157,14 +158,14 @@ public static class ReleaseCommand
     {
         if (commits.Count == 0)
         {
-            Console.WriteLine("  No conventional commits to report.");
+            CliOutput.Info("  No conventional commits to report.");
             return;
         }
         foreach (var c in commits)
         {
             var label = c.Breaking ? "BREAKING" : c.Type;
             var scope = c.Scope is not null ? $"({c.Scope})" : "";
-            Console.WriteLine($"  {label}{scope}: {c.Description}");
+            CliOutput.Info($"  {label}{scope}: {c.Description}");
         }
     }
 }

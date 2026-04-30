@@ -92,7 +92,17 @@ monorepo off
 
 Removes the sentinel. Your repos are independent again. The overlay files remain on disk but are completely inert without the sentinel — they import nothing, change nothing.
 
-### 4. Update when repos drift
+### 4. Start-of-day sync
+
+Pull all repos and refresh the overlay in one command:
+
+```bash
+monorepo sync
+```
+
+Runs `git pull` in every repo, then re-scans and regenerates the overlay. Add `--parallel` to pull all repos concurrently. This is the recommended daily driver — run it once in the morning and you're up to date.
+
+### 5. Update when repos drift
 
 When you add packages, create new projects, or bring in new repos:
 
@@ -107,6 +117,16 @@ Check what the overlay currently knows:
 ```bash
 monorepo status
 ```
+
+### 6. Auto-refresh while you work
+
+Keep the overlay in sync automatically as you edit csproj files:
+
+```bash
+monorepo watch
+```
+
+Watches `backend/` for csproj changes and re-runs the overlay refresh after a short debounce (default 1500 ms). Runs until Ctrl+C. Pass `--debounce <ms>` to tune the delay.
 
 ---
 
@@ -141,6 +161,8 @@ When the sentinel is absent, the `Condition="Exists(...)"` on every import is fa
 
 ## Command Reference
 
+### Overlay control
+
 | Command | What it does |
 |---|---|
 | `monorepo init --backend <path>` | First-time setup: scan, write config, generate overlay |
@@ -151,15 +173,30 @@ When the sentinel is absent, the `Condition="Exists(...)"` on every import is fa
 | `monorepo status` | Show state, mappings, exempt repos, drift |
 | `monorepo enable <packageId>` | Re-enable a previously disabled mapping |
 | `monorepo disable <packageId>` | Disable a mapping (keeps `PackageReference` for that package) |
-| `monorepo cpm` | Migrate to Central Package Management |
+| `monorepo watch` | Watch `backend/` for csproj changes and auto-refresh the overlay |
+
+### Daily workflow
+
+| Command | What it does |
+|---|---|
+| `monorepo sync [--parallel]` | Pull all repos + refresh overlay — start-of-day command |
+| `monorepo pull [--parallel]` | `git pull` in every repo |
+| `monorepo push [--parallel]` | `git push` in every repo |
+| `monorepo fetch [--parallel]` | `git fetch` in every repo |
+| `monorepo changes [--parallel]` | Show uncommitted changes across all repos (`git status --short`) |
+| `monorepo exec -- <cmd> [--parallel]` | Run any command in every repo |
+
+### Versioning & migration
+
+| Command | What it does |
+|---|---|
 | `monorepo release` | Bump version, write `CHANGELOG.md`, create git tag |
 | `monorepo bump patch\|minor\|major` | Create a version tag without writing a changelog |
-| `monorepo clean` | Delete all `bin/` and `obj/` directories across all repos |
-| `monorepo clone` | Clone all repos listed in `monorepo.json` that are missing locally |
-| `monorepo changes` | Show uncommitted changes across all repos (`git status --short`) |
-| `monorepo exec -- <cmd>` | Run any command in every repo (e.g. `monorepo exec -- git log --oneline -3`) |
+| `monorepo cpm` | Migrate to Central Package Management |
+| `monorepo clean [--parallel]` | Delete all `bin/` and `obj/` directories across all repos |
+| `monorepo clone` | Clone repos listed in `monorepo.json` that are missing locally |
 
-Every command accepts `--dry-run` to preview changes without writing anything, and `--help` for full option details.
+Every command accepts `--help` for full option details. `generate`, `clean`, and `watch` also accept `--dry-run`.
 
 ---
 

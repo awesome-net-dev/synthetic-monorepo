@@ -1,5 +1,5 @@
 using System.CommandLine;
-using System.Diagnostics;
+using Monorepo.Tool.IO;
 using Monorepo.Tool.Serialization;
 
 namespace Monorepo.Tool.Commands;
@@ -12,12 +12,14 @@ public static class ChangesCommand
         {
             Description = "Path of the target repo relative to backendRoot. Defaults to all repos."
         };
-
+        var parallelOpt = new Option<bool>("--parallel")
+        {
+            Description = "Run git status in all repos concurrently."
+        };
         var allOpt = new Option<bool>("--all")
         {
             Description = "Also list repos with no changes (clean)."
         };
-
         var configOpt = new Option<FileInfo?>("--config")
         {
             Description = "Explicit path to monorepo.json. Defaults to walking up from CWD."
@@ -26,12 +28,13 @@ public static class ChangesCommand
         var cmd = new Command("changes",
             "Show 'git status --short' for every repo. Clean repos are hidden unless --all is passed.")
         {
-            repoOpt, allOpt, configOpt,
+            repoOpt, parallelOpt, allOpt, configOpt,
         };
 
         cmd.SetAction(parseResult =>
         {
             var repoFilter = parseResult.GetValue(repoOpt);
+            var parallel   = parseResult.GetValue(parallelOpt);
             var showAll    = parseResult.GetValue(allOpt);
             var configFile = parseResult.GetValue(configOpt);
             var configPath = configFile?.FullName
@@ -39,14 +42,14 @@ public static class ChangesCommand
 
             if (configPath is null)
             {
-                Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
-                return (int)IO.ExitCode.ConfigNotFound;
+                CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
+                return (int)ExitCode.ConfigNotFound;
             }
 
-            var config      = ConfigSerializer.Load(configPath);
+            var config = ConfigSerializer.Load(configPath);
             var backendRoot = Path.GetFullPath(
                 Path.Combine(Path.GetDirectoryName(configPath)!,
-                             config.BackendRoot.Replace('/', Path.DirectorySeparatorChar)));
+                    config.BackendRoot.Replace('/', Path.DirectorySeparatorChar)));
 
             var targetRepos = config.Repos
                 .Where(r => repoFilter is null
@@ -55,54 +58,39 @@ public static class ChangesCommand
 
             if (targetRepos.Count == 0)
             {
-                Console.Error.WriteLine(repoFilter is null
+                CliOutput.Error(repoFilter is null
                     ? "No repos found in config."
                     : $"Repo '{repoFilter}' not found in config.");
-                return (int)IO.ExitCode.InvalidInput;
+                return (int)ExitCode.InvalidInput;
             }
 
+            var results = GitMultiRepoRunner
+                .RunAsync(targetRepos, backendRoot, ["git", "status", "--short"], parallel)
+                .GetAwaiter().GetResult();
+
             var dirty = 0;
-
-            foreach (var repo in targetRepos)
+            foreach (var r in results)
             {
-                var repoDir = Path.Combine(backendRoot, repo.Path.Replace('/', Path.DirectorySeparatorChar));
-
-                if (!Directory.Exists(repoDir))
+                if (r.ExitCode == -1)
                 {
-                    Console.Error.WriteLine($"  ⚠  {repo.Path} — directory not found.");
+                    CliOutput.Warning($"  ⚠  {r.RepoPath} — directory not found.");
                     continue;
                 }
-
-                var psi = new ProcessStartInfo("git")
+                if (r.Output.Length == 0)
                 {
-                    WorkingDirectory       = repoDir,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError  = true,
-                    UseShellExecute        = false,
-                };
-                psi.ArgumentList.Add("status");
-                psi.ArgumentList.Add("--short");
-
-                using var proc = Process.Start(psi)!;
-                var output = proc.StandardOutput.ReadToEnd().TrimEnd();
-                proc.WaitForExit();
-
-                if (output.Length == 0)
-                {
-                    if (showAll)
-                        Console.WriteLine($"  ✓  {repo.Path}");
+                    if (showAll) CliOutput.Muted($"  ✓  {r.RepoPath}");
                     continue;
                 }
-
-                Console.WriteLine($"\n── {repo.Path}");
-                Console.WriteLine(output);
+                CliOutput.Header($"\n── {r.RepoPath}");
+                Console.WriteLine(r.Output);
                 dirty++;
             }
 
             Console.WriteLine();
-            Console.WriteLine(dirty == 0
-                ? "All repos clean."
-                : $"{dirty} repo(s) with uncommitted changes.");
+            if (dirty == 0)
+                CliOutput.Success("All repos clean.");
+            else
+                CliOutput.Warning($"{dirty} repo(s) with uncommitted changes.");
 
             return 0;
         });

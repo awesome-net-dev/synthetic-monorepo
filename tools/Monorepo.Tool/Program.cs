@@ -6,13 +6,20 @@ namespace Monorepo.Tool;
 
 public static class Program
 {
-    public static async Task<int> Main(string[] args)
+    public static async Task<int> Main(string[] args) => await Run(args, watcherFactory: null);
+
+    public static async Task<int> Run(string[] args, Func<string, IFileWatcher>? watcherFactory)
     {
         try
         {
-            return await BuildRoot().Parse(args).InvokeAsync();
+            return await BuildRoot(watcherFactory).Parse(args).InvokeAsync();
         }
         catch (FileNotFoundException ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            return (int)ExitCode.ConfigNotFound;
+        }
+        catch (DirectoryNotFoundException ex)
         {
             Console.Error.WriteLine($"Error: {ex.Message}");
             return (int)ExitCode.ConfigNotFound;
@@ -31,7 +38,7 @@ public static class Program
         }
     }
 
-    public static RootCommand BuildRoot()
+    public static RootCommand BuildRoot(Func<string, IFileWatcher>? watcherFactory = null)
     {
         var root = new RootCommand(
             "Synthetic monorepo overlay manager — rewrites PackageReferences to " +
@@ -50,7 +57,12 @@ public static class Program
             BumpCommand.Build(),
             CloneCommand.Build(),
             ChangesCommand.Build(),
-            ExecCommand.Build()
+            ExecCommand.Build(),
+            PullCommand.Build(),
+            PushCommand.Build(),
+            FetchCommand.Build(),
+            SyncCommand.Build(),
+            WatchCommand.Build(watcherFactory)
         };
 
         root.SetAction(_ =>

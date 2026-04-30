@@ -4,50 +4,42 @@ using Monorepo.Tool.Serialization;
 
 namespace Monorepo.Tool.Commands;
 
-public static class ExecCommand
+public static class PushCommand
 {
     public static Command Build()
     {
-        var commandArg = new Argument<string[]>("command")
-        {
-            Arity = ArgumentArity.OneOrMore,
-            Description = "Command and arguments to run in each repo (pass after --).",
-        };
         var repoOpt = new Option<string?>("--repo")
         {
-            Description = "Path of the target repo relative to backendRoot. Defaults to all repos."
+            Description = "Run only in this repo (path relative to backend root)."
         };
         var parallelOpt = new Option<bool>("--parallel")
         {
-            Description = "Run the command in all repos concurrently."
+            Description = "Push all repos concurrently."
         };
         var allOpt = new Option<bool>("--all")
         {
-            Description = "Show a header for every repo, even those that produce no output."
+            Description = "Show a line for every repo, including those with nothing to push."
         };
         var configOpt = new Option<FileInfo?>("--config")
         {
             Description = "Explicit path to monorepo.json. Defaults to walking up from CWD."
         };
 
-        var cmd = new Command("exec",
-            "Run an arbitrary command in every repo. " +
-            "Repos that produce no output are hidden unless --all is passed.")
+        var cmd = new Command("push", "Run git push in every repo.")
         {
-            commandArg, repoOpt, parallelOpt, allOpt, configOpt,
+            repoOpt, parallelOpt, allOpt, configOpt,
         };
 
         cmd.SetAction(parseResult =>
         {
-            var args       = parseResult.GetValue(commandArg)!;
             var repoFilter = parseResult.GetValue(repoOpt);
             var parallel   = parseResult.GetValue(parallelOpt);
             var showAll    = parseResult.GetValue(allOpt);
             var configFile = parseResult.GetValue(configOpt);
             var configPath = configFile?.FullName
-                             ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
+                ?? ConfigSerializer.Locate(Directory.GetCurrentDirectory());
 
-            if (configPath is null)
+            if (configPath is null || !File.Exists(configPath))
             {
                 CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
                 return (int)ExitCode.ConfigNotFound;
@@ -71,39 +63,28 @@ public static class ExecCommand
                 return (int)ExitCode.InvalidInput;
             }
 
+            CliOutput.Header(repoFilter is null ? "Pushing all repos..." : $"Pushing {repoFilter}...");
             var results = GitMultiRepoRunner
-                .RunAsync(targetRepos, backendRoot, args, parallel)
+                .RunAsync(targetRepos, backendRoot, ["git", "push"], parallel)
                 .GetAwaiter().GetResult();
 
-            var failed = 0;
             foreach (var r in results)
             {
                 if (r.ExitCode == -1)
+                    CliOutput.Warning($"  ⚠  {r.RepoPath}  {r.Stderr}");
+                else if (!r.Success)
+                    CliOutput.Error($"  ✗ {r.RepoPath}  {r.Stderr}");
+                else
                 {
-                    CliOutput.Warning($"  ⚠  {r.RepoPath} — directory not found, skipping.");
-                    failed++;
-                    continue;
-                }
-
-                if (r.Output.Length == 0 && !showAll)
-                {
-                    if (!r.Success) failed++;
-                    continue;
-                }
-
-                CliOutput.Header($"\n── {r.RepoPath}");
-                if (r.Output.Length > 0)
-                    Console.WriteLine(r.Output);
-
-                if (!r.Success)
-                {
-                    CliOutput.Error($"  exited with code {r.ExitCode}");
-                    failed++;
+                    var msg = r.Stdout.Length > 0 ? r.Stdout.Split('\n')[0] : "pushed.";
+                    if (showAll || r.Stdout.Length > 0)
+                        CliOutput.Success($"  ✓ {r.RepoPath}  {msg}");
                 }
             }
 
             Console.WriteLine();
-            return failed > 0 ? (int)ExitCode.GeneralError : 0;
+            return results.Any(r => !r.Success && r.ExitCode != -1)
+                ? (int)ExitCode.GeneralError : 0;
         });
 
         return cmd;

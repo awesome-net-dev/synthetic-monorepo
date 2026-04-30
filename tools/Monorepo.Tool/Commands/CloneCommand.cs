@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
 using System.Diagnostics;
+using Monorepo.Tool.IO;
 using Monorepo.Tool.Serialization;
 
 namespace Monorepo.Tool.Commands;
@@ -46,8 +47,8 @@ public static class CloneCommand
 
             if (configPath is null)
             {
-                Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
-                return (int)IO.ExitCode.ConfigNotFound;
+                CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
+                return (int)ExitCode.ConfigNotFound;
             }
 
             var config = ConfigSerializer.Load(configPath);
@@ -67,20 +68,20 @@ public static class CloneCommand
                 if (Directory.Exists(targetDir))
                 {
                     if (verbose)
-                        Console.WriteLine($"  skip  {repo.Path} (already exists)");
+                        CliOutput.Muted($"  skip  {repo.Path} (already exists)");
                     skipped++;
                     continue;
                 }
 
                 if (repo.Url is null)
                 {
-                    Console.Error.WriteLine($"  ⚠  {repo.Path} — no URL in monorepo.json, cannot clone.");
+                    CliOutput.Warning($"  ⚠  {repo.Path} — no URL in monorepo.json, cannot clone.");
                     missing++;
                     continue;
                 }
 
-                Console.WriteLine($"  clone {repo.Path}");
-                Console.WriteLine($"        {repo.Url}");
+                CliOutput.Info($"  clone {repo.Path}");
+                CliOutput.Info($"        {repo.Url}");
 
                 if (!dryRun)
                 {
@@ -99,11 +100,11 @@ public static class CloneCommand
 
             Console.WriteLine();
             if (dryRun)
-                Console.WriteLine($"(dry-run) Would clone {cloned} repo(s). {skipped} already present, {missing} missing URL.");
+                CliOutput.Info($"(dry-run) Would clone {cloned} repo(s). {skipped} already present, {missing} missing URL.");
             else
-                Console.WriteLine($"Cloned {cloned} repo(s). {skipped} already present, {missing} skipped (no URL or error).");
+                CliOutput.Success($"Cloned {cloned} repo(s). {skipped} already present, {missing} skipped (no URL or error).");
 
-            return missing > 0 ? (int)IO.ExitCode.GeneralError : 0;
+            return missing > 0 ? (int)ExitCode.GeneralError : 0;
         });
 
         return cmd;
@@ -115,7 +116,7 @@ public static class CloneCommand
         {
             WorkingDirectory = Path.GetDirectoryName(targetDir)!,
             RedirectStandardOutput = !verbose,
-            RedirectStandardError = !verbose,
+            RedirectStandardError = false, // never redirect stderr — SSH needs it to prompt for passphrase
             UseShellExecute = false,
         };
         psi.ArgumentList.Add("clone");
@@ -123,8 +124,8 @@ public static class CloneCommand
         psi.ArgumentList.Add(targetDir);
         using var proc = Process.Start(psi)!;
         proc.WaitForExit();
-        if (proc.ExitCode != 0 && !verbose)
-            Console.Error.WriteLine($"        git clone failed (exit {proc.ExitCode}): {proc.StandardError.ReadToEnd().Trim()}");
+        if (proc.ExitCode != 0)
+            CliOutput.Error($"        git clone failed (exit {proc.ExitCode}).");
         return proc.ExitCode == 0;
     }
 }

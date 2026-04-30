@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Monorepo.Tool.Discovery;
 using Monorepo.Tool.Generation;
+using Monorepo.Tool.IO;
 using Monorepo.Tool.Model;
 using Monorepo.Tool.Serialization;
 
@@ -8,23 +9,92 @@ namespace Monorepo.Tool.Commands;
 
 public static class GenerateCommand
 {
+    public sealed record RefreshResult(
+        int Added,
+        int Stale,
+        int Total,
+        IReadOnlyList<string> Warnings);
+
+    public static RefreshResult RunRefresh(
+        string configPath,
+        bool dryRun = false,
+        bool verbose = false)
+    {
+        var config     = ConfigSerializer.Load(configPath);
+        var configDir  = Path.GetDirectoryName(configPath)!;
+        var overlayDir = Path.Combine(configDir, "overlay");
+        var backendRoot = Path.GetFullPath(
+            Path.Combine(configDir, config.BackendRoot.Replace('/', Path.DirectorySeparatorChar)));
+
+        var scan = MappingAnalyzer.Analyze(backendRoot, verbose);
+
+        var existingByPkg = config.Mappings
+            .ToDictionary(m => m.PackageId, StringComparer.OrdinalIgnoreCase);
+
+        var merged = scan.Mappings.Select(discovered =>
+        {
+            if (existingByPkg.TryGetValue(discovered.PackageId, out var existing))
+                return new PackageMapping
+                {
+                    PackageId  = existing.PackageId,
+                    CsprojPath = discovered.CsprojPath,
+                    Enabled    = existing.Enabled,
+                };
+            return discovered;
+        }).ToList();
+
+        var discoveredPkgs = scan.Mappings
+            .Select(m => m.PackageId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var stale = config.Mappings
+            .Where(m => !discoveredPkgs.Contains(m.PackageId))
+            .Select(m => $"Stale mapping removed: '{m.PackageId}' (csproj no longer found).")
+            .ToList();
+
+        var added = scan.Mappings.Count(m => !existingByPkg.ContainsKey(m.PackageId));
+
+        var existingReposByPath = config.Repos
+            .ToDictionary(r => r.Path, StringComparer.OrdinalIgnoreCase);
+
+        config.Repos = scan.Repos.Select(discovered =>
+        {
+            if (existingReposByPath.TryGetValue(discovered.Path, out var existing))
+                discovered.Url ??= existing.Url;
+            return discovered;
+        }).ToList();
+
+        config.Mappings = merged;
+
+        if (!dryRun)
+            ConfigSerializer.Save(config, configPath);
+
+        var slnxPath = Path.Combine(configDir, "Monorepo.slnx");
+        ShimWriter.Write(backendRoot, overlayDir, dryRun);
+        OverlayWriter.Write(overlayDir, backendRoot, config.Mappings, dryRun);
+        SlnxWriter.Write(slnxPath, backendRoot, config.Repos, dryRun);
+
+        return new RefreshResult(
+            added,
+            stale.Count,
+            config.Mappings.Count,
+            scan.Warnings.Concat(stale).ToList());
+    }
+
     public static Command Build()
     {
         var refreshOpt = new Option<bool>("--refresh")
         {
             Description = "Re-scan repos and update monorepo.json before regenerating the overlay.",
         };
-
         var dryRunOpt = new Option<bool>("--dry-run")
         {
             Description = "Print what would be written without touching the filesystem.",
         };
-
         var verboseOpt = new Option<bool>("--verbose")
         {
             Description = "Log every csproj scanned (only meaningful with --refresh).",
         };
-
         var configOpt = new Option<FileInfo?>("--config")
         {
             Description = "Explicit path to monorepo.json. " +
@@ -34,10 +104,7 @@ public static class GenerateCommand
         var cmd = new Command("generate",
             "Regenerate the MSBuild overlay from monorepo.json (optionally re-scanning repos first).")
         {
-            refreshOpt,
-            dryRunOpt,
-            verboseOpt,
-            configOpt,
+            refreshOpt, dryRunOpt, verboseOpt, configOpt,
         };
 
         cmd.SetAction(parseResult =>
@@ -52,77 +119,42 @@ public static class GenerateCommand
 
             if (configPath is null)
             {
-                Console.Error.WriteLine("Error: monorepo.json not found. Run 'monorepo init' first.");
-                return (int)IO.ExitCode.ConfigNotFound;
+                CliOutput.Error("Error: monorepo.json not found. Run 'monorepo init' first.");
+                return (int)ExitCode.ConfigNotFound;
             }
-
-            var config     = ConfigSerializer.Load(configPath);
-            var overlayDir = Path.Combine(Path.GetDirectoryName(configPath)!, "overlay");
-            var backendRoot = Path.GetFullPath(
-                Path.Combine(Path.GetDirectoryName(configPath)!,
-                             config.BackendRoot.Replace('/', Path.DirectorySeparatorChar)));
 
             if (refresh)
             {
-                Console.WriteLine("Re-scanning repos...");
-                var result = MappingAnalyzer.Analyze(backendRoot, verbose);
-
-                // Merge: preserve Enabled=false overrides; add new; warn on disappeared.
-                var existingByPkg = config.Mappings
-                    .ToDictionary(m => m.PackageId, StringComparer.OrdinalIgnoreCase);
-
-                var merged = result.Mappings.Select(discovered =>
-                {
-                    if (existingByPkg.TryGetValue(discovered.PackageId, out var existing))
-                        return new PackageMapping
-                        {
-                            PackageId  = existing.PackageId,
-                            CsprojPath = discovered.CsprojPath,   // refresh path from disk
-                            Enabled    = existing.Enabled,        // preserve manual override
-                        };
-                    return discovered;
-                }).ToList();
-
-                // Warn about mappings that disappeared from disk.
-                var discoveredPkgs = result.Mappings
-                    .Select(m => m.PackageId)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                foreach (var stale in config.Mappings.Where(m => !discoveredPkgs.Contains(m.PackageId)))
-                    Console.WriteLine($"  ⚠  Stale mapping removed: '{stale.PackageId}' (csproj no longer found).");
-
-                var existingReposByPath = config.Repos
-                    .ToDictionary(r => r.Path, StringComparer.OrdinalIgnoreCase);
-
-                config.Repos = result.Repos.Select(discovered =>
-                {
-                    if (existingReposByPath.TryGetValue(discovered.Path, out var existing))
-                        discovered.Url ??= existing.Url; // keep manually-set URL if scanner found none
-                    return discovered;
-                }).ToList();
-
-                config.Mappings = merged;
+                CliOutput.Header("Re-scanning repos...");
+                var result = RunRefresh(configPath, dryRun, verbose);
 
                 foreach (var w in result.Warnings)
-                    Console.WriteLine($"  ⚠  {w}");
+                    CliOutput.Warning($"  ⚠  {w}");
 
-                if (!dryRun)
-                {
-                    ConfigSerializer.Save(config, configPath);
-                    Console.WriteLine($"  Updated: {configPath}");
-                }
-                else
-                {
-                    Console.WriteLine($"  [dry-run] Would update: {configPath}");
-                }
+                CliOutput.Muted($"  {result.Total} mappings active" +
+                    (result.Added > 0 ? $", {result.Added} new" : "") +
+                    (result.Stale > 0 ? $", {result.Stale} stale removed" : "") + ".");
+
+                if (dryRun) CliOutput.Muted($"  [dry-run] Would update: {configPath}");
+                else        CliOutput.Info($"  Updated: {configPath}");
+            }
+            else
+            {
+                var config     = ConfigSerializer.Load(configPath);
+                var configDir  = Path.GetDirectoryName(configPath)!;
+                var overlayDir = Path.Combine(configDir, "overlay");
+                var backendRoot = Path.GetFullPath(
+                    Path.Combine(configDir,
+                        config.BackendRoot.Replace('/', Path.DirectorySeparatorChar)));
+                var slnxPath = Path.Combine(configDir, "Monorepo.slnx");
+
+                CliOutput.Header("Generating overlay files...");
+                ShimWriter.Write(backendRoot, overlayDir, dryRun);
+                OverlayWriter.Write(overlayDir, backendRoot, config.Mappings, dryRun);
+                SlnxWriter.Write(slnxPath, backendRoot, config.Repos, dryRun);
             }
 
-            var slnxPath = Path.Combine(Path.GetDirectoryName(configPath)!, "Monorepo.slnx");
-            Console.WriteLine("Generating overlay files...");
-            ShimWriter.Write(backendRoot, overlayDir, dryRun);
-            OverlayWriter.Write(overlayDir, backendRoot, config.Mappings, dryRun);
-            SlnxWriter.Write(slnxPath, backendRoot, config.Repos, dryRun);
-
-            Console.WriteLine("Done.");
+            CliOutput.Success("Done.");
             return 0;
         });
 

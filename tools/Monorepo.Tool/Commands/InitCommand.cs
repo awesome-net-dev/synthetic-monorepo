@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Monorepo.Tool.Discovery;
 using Monorepo.Tool.Generation;
+using Monorepo.Tool.IO;
 using Monorepo.Tool.Model;
 using Monorepo.Tool.Serialization;
 
@@ -60,28 +61,28 @@ public static class InitCommand
             var configPath = Path.Combine(overlay.FullName, "monorepo.json");
             if (File.Exists(configPath) && !force)
             {
-                Console.Error.WriteLine(
+                CliOutput.Error(
                     $"Error: {configPath} already exists. Use 'monorepo generate --refresh' to update it " +
                     "(which preserves manual Enabled=false overrides), or pass --force to overwrite.");
-                return (int)IO.ExitCode.InvalidInput;
+                return (int)ExitCode.InvalidInput;
             }
 
-            Console.WriteLine("Discovering repos...");
+            CliOutput.Header("Discovering repos...");
             var result = MappingAnalyzer.Analyze(backend.FullName, verbose);
 
             // Print repo summary
             var totalRepos  = result.Repos.Count;
             var exemptRepos = result.Repos.Count(r => r.Exempt);
-            Console.WriteLine($"  {totalRepos} repos found, {exemptRepos} exempt, " +
-                              $"{totalRepos - exemptRepos} active.");
+            CliOutput.Info($"  {totalRepos} repos found, {exemptRepos} exempt, " +
+                          $"{totalRepos - exemptRepos} active.");
 
             foreach (var r in result.Repos.Where(r => r.Exempt))
-                Console.WriteLine($"  ⚠  EXEMPT: {r.Path} — {r.ExemptReason}");
+                CliOutput.Warning($"  ⚠  EXEMPT: {r.Path} — {r.ExemptReason}");
 
-            Console.WriteLine($"  {result.Mappings.Count} cross-repo mappings discovered.");
+            CliOutput.Info($"  {result.Mappings.Count} cross-repo mappings discovered.");
 
             foreach (var w in result.Warnings)
-                Console.WriteLine($"  ⚠  {w}");
+                CliOutput.Warning($"  ⚠  {w}");
 
             // Build config
             var config = new MonorepoConfig
@@ -94,27 +95,27 @@ public static class InitCommand
 
             // Write monorepo.json
             if (dryRun)
-                Console.WriteLine($"  [dry-run] Would write: {configPath}");
+                CliOutput.Muted($"  [dry-run] Would write: {configPath}");
             else
             {
                 ConfigSerializer.Save(config, configPath);
-                Console.WriteLine($"  Written:   {configPath}");
+                CliOutput.Muted($"  Written:   {configPath}");
             }
 
             // Generate overlay and solution
             var overlayDir = Path.Combine(overlay.FullName, "overlay");
             var slnxPath    = Path.Combine(overlay.FullName, "Monorepo.slnx");
-            Console.WriteLine("Generating overlay files...");
+            CliOutput.Header("Generating overlay files...");
             ShimWriter.Write(backend.FullName, overlayDir, dryRun);
             OverlayWriter.Write(overlayDir, backend.FullName, config.Mappings, dryRun);
             SlnxWriter.Write(slnxPath, backend.FullName, config.Repos, dryRun);
 
             // Activate sentinel
-            Console.WriteLine("Activating sentinel...");
+            CliOutput.Header("Activating sentinel...");
             SentinelManager.Activate(backend.FullName, dryRun);
 
             Console.WriteLine();
-            Console.WriteLine("Done. Run 'monorepo status' to verify.");
+            CliOutput.Success("Done. Run 'monorepo status' to verify.");
             return 0;
         });
 
