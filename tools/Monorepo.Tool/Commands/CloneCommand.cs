@@ -116,7 +116,7 @@ public static class CloneCommand
         {
             WorkingDirectory = Path.GetDirectoryName(targetDir)!,
             RedirectStandardOutput = !verbose,
-            RedirectStandardError = !verbose,
+            RedirectStandardError = false, // never redirect stderr — SSH needs it to prompt for passphrase
             UseShellExecute = false,
         };
         psi.ArgumentList.Add("clone");
@@ -124,8 +124,8 @@ public static class CloneCommand
         psi.ArgumentList.Add(targetDir);
         using var proc = Process.Start(psi)!;
         proc.WaitForExit();
-        if (proc.ExitCode != 0 && !verbose)
-            CliOutput.Error($"        git clone failed (exit {proc.ExitCode}): {proc.StandardError.ReadToEnd().Trim()}");
+        if (proc.ExitCode != 0)
+            CliOutput.Error($"        git clone failed (exit {proc.ExitCode}).");
         return proc.ExitCode == 0;
     }
 }
